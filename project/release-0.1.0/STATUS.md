@@ -1,11 +1,11 @@
 # Clave 0.1.0 release status
 
-Updated: 2026-11-14
+Updated: 2026-11-15
 
 | Day | State | Exit condition |
 |---|---|---|
-| Day 1 - repository foundation | In progress | Remote, author identity, metadata, first push |
-| Day 2 - encrypted vault core | Ready | Core commit pushed; API tests pass |
+| Day 1 - repository foundation | Complete | Commit `aced2b2` and status update pushed |
+| Day 2 - encrypted vault core | Complete | Core commit `e62fcf8` and status update pushed |
 | Day 3 - CLI and user workflow | Ready | CLI commit pushed; CLI tests pass |
 | Day 4 - verification and CI | Ready | All local and GitHub matrix checks green |
 | Day 5 - release rehearsal | Ready | TestPyPI install passes; release PR approved |
@@ -22,9 +22,10 @@ Updated: 2026-11-14
 - Based the release branch on the existing `origin/main` history.
 - Configured `origin` as `https://github.com/savankrm/Clave.git`.
 - Configured the repository-local Git author identity.
-- Staged only the Day 1 repository-foundation files.
+- Committed and pushed only the Day 1 repository-foundation files.
 - Confirmed `git diff --cached --check` passes.
 - Parsed `pyproject.toml` with the installed system Python successfully.
+- Set the upstream branch to `origin/release/clave-0.1.0`.
 
 ## Existing local evidence
 
@@ -35,3 +36,18 @@ Updated: 2026-11-14
 - Native installed-wheel smoke test passed.
 
 Repeat the checks on each day's staged state and record remote CI results here.
+
+## Local Day 2 checkpoint
+
+- Reviewed initialization, key handling, encrypted payloads, transaction safety,
+  type collisions, identifiers, path safety, and redacted return models.
+- Ruff lint passed for `src/clave`.
+- Ruff formatting check passed for all 10 source files.
+- Strict mypy targeting Python 3.10 passed for all 10 source files.
+- The first Vault test attempt was blocked by an inaccessible Windows pytest temp
+  folder; retrying with an ignored repository-local temp directory succeeded.
+- Vault suite result: 38 passed and one expected POSIX-permission skip on Windows.
+- Security-critical core coverage: crypto, identifiers, storage, and Vault 100%;
+  config 97%.
+- Staged-file and secret-pattern checks passed for the nine Day 2 files.
+- Committed and pushed `e62fcf8` to `origin/release/clave-0.1.0`.
