@@ -1,12 +1,12 @@
 # Clave 0.1.0 release status
 
-Updated: 2026-11-15
+Updated: 2026-11-16
 
 | Day | State | Exit condition |
 |---|---|---|
 | Day 1 - repository foundation | Complete | Commit `aced2b2` and status update pushed |
 | Day 2 - encrypted vault core | Complete | Core commit `e62fcf8` and status update pushed |
-| Day 3 - CLI and user workflow | Ready | CLI commit pushed; CLI tests pass |
+| Day 3 - CLI and user workflow | Complete | CLI commit `b663f84` and status update pushed |
 | Day 4 - verification and CI | Ready | All local and GitHub matrix checks green |
 | Day 5 - release rehearsal | Ready | TestPyPI install passes; release PR approved |
 
@@ -51,3 +51,16 @@ Repeat the checks on each day's staged state and record remote CI results here.
   config 97%.
 - Staged-file and secret-pattern checks passed for the nine Day 2 files.
 - Committed and pushed `e62fcf8` to `origin/release/clave-0.1.0`.
+
+## Local Day 3 checkpoint
+
+- Reviewed hidden prompts, positional-value warnings, noninteractive failures,
+  metadata-only reads, same-type replacement, and delete confirmation.
+- Ruff lint passed for source, the CLI tests, and the example fixture.
+- Ruff formatting check passed for all 12 reviewed Python files.
+- CLI suite result: 7 passed with `cli.py` at 100% coverage and 93% overall
+  coverage for the CLI-only run.
+- `python -m clave --help` succeeded with the installed system Python.
+- Staged-file, whitespace, and secret-pattern checks passed for the four Day 3
+  paths.
+- Committed and pushed `b663f84` to `origin/release/clave-0.1.0`.
