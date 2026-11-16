@@ -18,7 +18,7 @@ def main() -> None:
     )
     assert Path(clave.__file__).is_relative_to(installed_root)
     with TemporaryDirectory() as directory:
-        root = Path(directory)
+        root = Path(directory).resolve()
 
         def cli(*args: str, success: bool = True) -> subprocess.CompletedProcess[str]:
             result = subprocess.run(
