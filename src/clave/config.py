@@ -13,7 +13,7 @@ from .exceptions import UnsafePath
 def safe_path(path: Path) -> None:
     for candidate in (path, *path.parents):
         try:
-            attributes = candidate.lstat().st_file_attributes
+            attributes = getattr(candidate.lstat(), "st_file_attributes", 0)
         except (AttributeError, FileNotFoundError):
             attributes = 0
         if candidate.is_symlink() or (

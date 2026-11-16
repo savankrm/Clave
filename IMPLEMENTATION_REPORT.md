@@ -72,3 +72,12 @@ filesystem races, plaintext API handling, forensic-deletion limitations,
 irreversible loss, and the V1 recovery and CI distribution limitations.
 
 Installed-wheel native smoke result was PASS on 2026-11-17.
+
+## CI portability correction
+
+The first macOS CI run rejected direct access to the Windows-only stat attribute.
+The owner approved including src/clave/config.py in a corrective commit.
+Using getattr with a zero default preserves path checking across operating systems.
+The rebuilt wheel passed strict Twine and native installed-wheel smoke checks.
+The complete local suite again passed with 45 tests, one expected Windows skip
+and 99% coverage. Ruff lint and formatting passed.
