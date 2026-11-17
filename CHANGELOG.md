@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Vault and CLI
+
+- Create the SQLite schema, key check, and first vault entry in a single
+  transaction. A failure before the commit attempt triggers cleanup of newly
+  created files where possible. Each operation loads the vault key once.
+- Allow redirected directories above the vault while rejecting symlinks and
+  junctions at the vault root, storage directories, and files. Preserve existing
+  directory permissions and support paths containing SQLite URI characters.
+- Validate IDs and usernames before prompting for secrets. Keep each invocation's
+  vault in its command context and report missing arguments without echoing input.
+- Export `Vault`, public exceptions, and return types at the package root.
+
+### Packaging, tests, and documentation
+
+- Limit the source distribution to package code, tests, and essential build and
+  licensing files. Expand Git ignore rules for local secret and build artifacts.
+- Widen Typer support to `>=0.28,<1.0`, require `cryptography>=50.0.2`, and add
+  package keywords and classifiers for PyPI discovery.
+- Add focused Fernet and identifier tests. Run the [pytest login example](examples/README.md)
+  in CI to verify the documented fixture with fake credentials.
+- Update checkout in both workflows to `actions/checkout@v7.0.1` on Node.js 24.
+- Add a [beginner's TestPyPI manual](TESTPYPI_MANUAL.md) covering workflow setup,
+  deployment approval, local installation, and verification.
+- Local validation reported 66 tests passed, one expected Windows skip, and
+  99% statement coverage. The package build, strict Twine validation, and
+  installed-wheel smoke test also passed.
+
 ## 0.1.0 — release candidate
 
 ### Features
