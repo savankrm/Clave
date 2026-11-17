@@ -6,19 +6,17 @@ Clave is a local encrypted vault for passwords and API tokens used in Python
 development and test automation. It supports Python 3.10 and newer on Windows,
 macOS, and Linux.
 
-**Release status.** Version 0.1.0 is available for evaluation on
-[TestPyPI](https://test.pypi.org/project/clave/0.1.0/). Follow the [verified
-installation steps](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#1-install-clave)
-to install its dependencies and wheel in a clean environment. This checkout adds
-an interactive menu, overwrite confirmation, diagnostics, backup, and restore.
+**Release status.** Clave is a developer beta. See the
+[installation guide](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#1-install-clave)
+for PyPI, TestPyPI, and source installs.
 
 ## Quick start
 
-To try the current checkout, activate a virtual environment from the repository
-root and run:
+Once 0.2.0 is available on PyPI, install it in a virtual environment and save a
+credential:
 
 ```console
-python -m pip install .
+python -m pip install clave==0.2.0
 clave store db_user.dev ExampleUser
 ```
 

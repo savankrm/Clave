@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 ### Vault and CLI
 
@@ -32,11 +32,9 @@
 - Add focused Fernet and identifier tests. Run the [pytest login example](examples/README.md)
   in CI to verify the documented fixture with fake credentials.
 - Update checkout in both workflows to `actions/checkout@v7.0.1` on Node.js 24.
-- Add a [beginner's TestPyPI manual](TESTPYPI_MANUAL.md) covering workflow setup,
-  deployment approval, local installation, and verification.
-- Local validation reported 66 tests passed, one expected Windows skip, and
-  99% statement coverage. The package build, strict Twine validation, and
-  installed-wheel smoke test also passed.
+- Run the full test matrix on pull requests and an installation smoke check on pushes.
+- Run both publishing destinations manually from `main`. Production uses the
+  distributions verified on TestPyPI for the same commit.
 
 ## 0.1.0 — release candidate
 

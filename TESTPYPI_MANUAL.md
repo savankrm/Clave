@@ -1,4 +1,7 @@
-# Clave publishing manual — starting with code on GitHub
+# Historical TestPyPI walkthrough for Clave 0.1.0
+
+For current releases, use the [publishing guide](PUBLISHING.md). The steps below
+document the original rehearsal on the 0.1.0 release branch.
 
 This guide assumes you know only that the Clave code has reached GitHub.
 Follow the numbered steps to understand the setup, approve a practice release,

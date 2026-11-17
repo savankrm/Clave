@@ -8,18 +8,23 @@ Clave supports Python 3.10 and newer on Windows, macOS, and Linux.
 
 ## 1. Install Clave
 
-The public 0.1.0 evaluation release is on TestPyPI. From an active virtual
-environment, install its dependencies from PyPI and its wheel from TestPyPI:
+Once 0.2.0 is on PyPI, install it from an active virtual environment:
 
 ```console
-python -m pip install "cryptography>=46" "typer>=0.29,<0.30" "platformdirs>=4"
-python -m pip install --index-url https://test.pypi.org/simple/ --no-deps clave==0.1.0
+python -m pip install clave==0.2.0
 clave --help
 ```
 
-For Windows setup and verification, see the [TestPyPI walkthrough](TESTPYPI_MANUAL.md#step-15--create-a-fresh-practice-environment).
-For the newer commands described in this guide, install from the repository
-root inside a separate virtual environment:
+For a TestPyPI rehearsal, download the exact 0.2.0 wheel from TestPyPI and install
+it locally so dependencies come from production PyPI:
+
+```console
+python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.0
+python -m pip install ./clave-0.2.0-py3-none-any.whl
+clave --help
+```
+
+To try the checkout, install from the repository root in a separate virtual environment:
 
 ```console
 python -m pip install .

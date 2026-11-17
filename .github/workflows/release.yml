@@ -1,9 +1,6 @@
 name: release rehearsal
 
 on:
-  push:
-    branches: [release/clave-0.1.0]
-    paths: [.github/workflows/release.yml, PUBLISHING.md]
   workflow_dispatch:
     inputs:
       destination:
@@ -23,10 +20,12 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name == 'push' || inputs.destination == 'testpypi'
+    if: inputs.destination == 'testpypi' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -59,6 +58,10 @@ jobs:
           PY
       - run: python -m venv .smoke
       - run: .smoke/bin/python -m pip install dist/*.whl
+      - name: Read the built package version
+        id: metadata
+        run: |
+          .smoke/bin/python -c 'from importlib.metadata import version; print("version=" + version("clave"))' >> "$GITHUB_OUTPUT"
       - run: .smoke/bin/python scripts/smoke_wheel.py .smoke .smoke/bin/clave
       - uses: actions/upload-artifact@v4
         with:
@@ -86,7 +89,7 @@ jobs:
           print-hash: true
 
   verify-testpypi:
-    needs: testpypi
+    needs: [build, testpypi]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -102,12 +105,35 @@ jobs:
           name: clave-distributions
           path: dist
       - name: Install exact release from TestPyPI in a fresh environment
+        env:
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
         run: |
           python -m venv .smoke
-          .smoke/bin/python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: --dest downloaded 'clave==0.1.0'
-          cmp dist/clave-0.1.0-py3-none-any.whl downloaded/clave-0.1.0-py3-none-any.whl
+          .smoke/bin/python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: --dest downloaded "clave==$RELEASE_VERSION"
+          cmp "dist/clave-$RELEASE_VERSION-py3-none-any.whl" "downloaded/clave-$RELEASE_VERSION-py3-none-any.whl"
           .smoke/bin/python -m pip install downloaded/*.whl
           .smoke/bin/python scripts/smoke_wheel.py .smoke .smoke/bin/clave
+      - name: Verify the published wheel and source archive hashes
+        env:
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from urllib.parse import quote
+          from urllib.request import urlopen
+
+          version = quote(os.environ["RELEASE_VERSION"], safe="")
+          with urlopen(f"https://test.pypi.org/pypi/clave/{version}/json", timeout=30) as response:
+              published = {item["filename"]: item["digests"]["sha256"] for item in json.load(response)["urls"]}
+          for path in sorted(Path("dist").iterdir()):
+              expected = hashlib.sha256(path.read_bytes()).hexdigest()
+              if published.get(path.name) != expected:
+                  raise SystemExit(f"TestPyPI hash does not match for {path.name}")
+              print(path.name, expected)
+          PY
 
   pypi:
     if: github.event_name == 'workflow_dispatch' && inputs.destination == 'pypi' && github.ref == 'refs/heads/main'
@@ -126,14 +152,18 @@ jobs:
         with:
           script: |
             const id = process.env.REHEARSAL_RUN_ID;
-            if (!/^\d+$/.test(id)) throw new Error('A rehearsal run ID is required');
+            if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) {
+              throw new Error('A valid rehearsal run ID is required');
+            }
             const {data: run} = await github.rest.actions.getWorkflowRun({
               ...context.repo, run_id: Number(id)
             });
             if (run.path !== '.github/workflows/release.yml' ||
-                run.head_branch !== 'release/clave-0.1.0' ||
-                run.event !== 'push' || run.conclusion !== 'success') {
-              throw new Error('Select a successful release-branch rehearsal');
+                run.head_branch !== 'main' ||
+                run.head_sha !== context.sha ||
+                run.event !== 'workflow_dispatch' ||
+                run.conclusion !== 'success') {
+              throw new Error('Select a successful rehearsal from this commit on main');
             }
             const {data: jobs} = await github.rest.actions.listJobsForWorkflowRun({
               ...context.repo, run_id: Number(id), per_page: 100
