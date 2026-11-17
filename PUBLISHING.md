@@ -6,7 +6,7 @@ The release branch is `release/clave-0.1.0` in `savankrm/Clave`.
 Day 4 completed with an owner waiver for delayed macOS jobs. The final observed
 Day 4 run had 16 successful jobs and two cancelled jobs. The historical waiver
 covers macOS Python 3.11, 3.12 and 3.14, with 3.11 subsequently passing.
-See `project/release-0.1.0/STATUS.md` for the recorded checkpoint.
+See [CHANGELOG.md](CHANGELOG.md) for release notes and verification results.
 
 TestPyPI rehearsal must succeed before production approval. The repository is
 public. Uploaded distributions and their included Python source are public too.
@@ -72,7 +72,7 @@ $env:PYTHONPATH = 'E:\Clave\.quality;E:\Clave\src'
 
 Use a new output directory for each build. If Windows Application Control blocks
 native mypy modules, prepend the existing `.typecheck-legacy` directory to
-PYTHONPATH for that check, as recorded in the implementation report.
+PYTHONPATH for that check.
 
 Inspect both archives for expected modules, `py.typed`, metadata and MIT license.
 Exclude local tool directories, caches, vaults and the untracked handoff. Use a
@@ -130,7 +130,7 @@ page. The smoke script uses temporary fake vaults and checks output for disclosu
 ## 6. Record rehearsal and prepare review
 
 Record the successful rehearsal run ID, source SHA, artifact hashes, TestPyPI URL,
-clean installation result and remaining owner decisions. Update STATUS.md in a
+clean installation result and remaining owner decisions. Update CHANGELOG.md in a
 separate commit and push. Open a draft PR from `release/clave-0.1.0` to `main`.
 The owner reviews the package information, Day 4 waiver, rehearsal evidence,
 environment protections and release workflow before approving integration.

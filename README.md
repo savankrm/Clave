@@ -179,7 +179,7 @@ CI runs the suite on Python 3.10 through 3.15 on Windows, macOS, and Linux. See
 complete manual,
 [PUBLISHING.md](https://github.com/savankrm/Clave/blob/main/PUBLISHING.md) for owner
 release steps, and
-[IMPLEMENTATION_REPORT.md](https://github.com/savankrm/Clave/blob/main/IMPLEMENTATION_REPORT.md)
-for verification evidence.
+[CHANGELOG.md](https://github.com/savankrm/Clave/blob/main/CHANGELOG.md)
+for release notes and verification results.
 
 MIT license is included for owner review. Nothing has been published by this build.

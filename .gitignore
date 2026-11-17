@@ -1,17 +1,43 @@
+# Python environments and local tooling
 __pycache__/
+*.py[cod]
 *.egg-info/
 .venv/
+venv/
 .quality/
 .typecheck/
 .typecheck-legacy/
 .smoke/
+
+# Test, type and lint caches and coverage
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+
+# Build artifacts
 dist/
 release-dist/
 build/
-*.sqlite3*
+
+# Local credentials, vaults and databases
+.env
+.env.*
+*.db
+*.db-*
+*.sqlite*
+*.clave
+*.vault
 *.key
+
+# Editor settings
+.idea/
+.vscode/
+
+# Internal working documents retained locally
+/CLAVE_CODING_AGENT_BRIEF.md
+/IMPLEMENTATION_REPORT.md
+/project/release-0.1.0/
