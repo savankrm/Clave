@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,10 +20,15 @@ class LocalFileKeyProvider:
         safe_path(self.path)
         key = Fernet.generate_key()
         fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(key)
-            stream.flush()
-            os.fsync(stream.fileno())
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(key)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError:
+            with suppress(OSError):
+                self.path.unlink()
+            raise
 
     def load(self) -> Fernet:
         safe_path(self.path)

@@ -8,16 +8,26 @@ Clave supports Python 3.10 and newer on Windows, macOS, and Linux.
 
 ## 1. Install Clave
 
-After it is published:
+Once 0.2.0 is on PyPI, install it from an active virtual environment:
 
 ```console
-python -m pip install clave
+python -m pip install clave==0.2.0
+clave --help
 ```
 
-For review from this checkout:
+For a TestPyPI rehearsal, download the exact 0.2.0 wheel from TestPyPI and install
+it locally so dependencies come from production PyPI:
 
 ```console
-python -m pip install dist/clave-0.1.0-py3-none-any.whl
+python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.0
+python -m pip install ./clave-0.2.0-py3-none-any.whl
+clave --help
+```
+
+To try the checkout, install from the repository root in a separate virtual environment:
+
+```console
+python -m pip install .
 clave --help
 ```
 
@@ -26,6 +36,11 @@ for installation and execution.
 
 ## 2. Store your first credential
 
+Run `clave` in a terminal and choose **Save a credential**. The menu also lets you
+save and inspect secrets, list entries, delete entries, check vault health, and
+back up or restore. Choose **0** to exit. You can use the direct commands in this
+guide from the same terminal.
+
 No separate initialization is required. Your first successful store automatically
 creates the random encryption key and database for your user account:
 
@@ -33,8 +48,9 @@ creates the random encryption key and database for your user account:
 clave store db_user.dev ExampleUser
 ```
 
-Enter the password at the hidden `Password:` prompt. Clave reports that it created
-the vault and credential. Future commands reuse that vault without an unlock prompt.
+The `Password:` prompt shows an asterisk for each character you type. Clave
+reports that it created the vault and credential. Future commands reuse that
+vault without an unlock prompt.
 
 Installation itself does not create user files. Python package installers may run
 in isolated build environments, as an administrator, or for a different user.
@@ -91,7 +107,9 @@ its own output. Blank usernames, passwords, and secret values are rejected.
 
 ## 5. Replace an existing value
 
-Use the same store command again. There are no update commands.
+Run the same store command again. After you enter the new value, Clave asks you
+to confirm in an interactive terminal. Type `y` to replace the entry. Press
+Enter or type `n` to keep the saved value.
 
 Replace the complete credential, including its username:
 
@@ -105,6 +123,15 @@ Replace a standalone secret:
 clave secret store api_token
 clave secret store api_token.qa
 ```
+
+For example:
+
+```text
+'api_token' is already saved. Replace it with the new secret? [y/N]:
+```
+
+Use `--replace` to skip confirmation. In a noninteractive session, replacing an
+existing entry requires that flag.
 
 Clave reports `created` for a new ID and `replaced` for an existing ID. A credential
 cannot replace an environment-scoped secret with the same ID, or vice versa.
@@ -192,7 +219,8 @@ def db_credentials(vault):
 ```
 
 There is no Clave pytest plugin. Keep credential fields out of test logs and failure
-messages. V1 is for local automation and does not provide secure CI/CD key delivery.
+messages. Clave supports local automation. Use your CI provider's secret store for
+CI/CD key delivery.
 
 ## 9. Delete an entry
 
@@ -203,15 +231,14 @@ clave delete db_user.dev
 The CLI asks for confirmation and defaults to No:
 
 ```text
-Delete db_user.dev? SQLite deletion is not forensic erasure. [y/N]:
+Delete db_user.dev? Copies may remain in storage or backups. [y/N]:
 ```
 
 Enter `y` or `Y` to delete. Enter `n`, `N`, or press Enter to cancel. For deliberate
 local scripts, `clave delete db_user.dev --yes` bypasses confirmation. Python's
 `vault.delete("db_user.dev")` does not prompt.
 
-SQLite deletion is not secure forensic erasure. Storage remnants or snapshots may
-still contain prior data.
+Storage remnants, snapshots, and earlier backups may still contain the value.
 
 ## 10. Vault locations
 
@@ -242,27 +269,58 @@ The CLI equivalent is `clave --data-dir PATH store ...`. Repeat `--data-dir PATH
 for every command that should use that vault. Clave creates `config/vault.key` and
 `data/vault.sqlite3` under the chosen root on its first successful store.
 
-## 11. Troubleshooting
+## 11. Check and recover your vault
+
+Run `clave doctor` to check vault files, schema, database integrity, and encrypted
+entries. It shows no entry names or values and exits with an error if a check
+fails. On Linux and macOS it also checks permissions on Clave's files and
+directories. On Windows, review folder permissions in **Properties → Security**.
+
+Create a backup and test the restore while the original vault is still available:
+
+```console
+clave backup clave-backup.clave
+clave --data-dir recovered-vault restore clave-backup.clave
+clave --data-dir recovered-vault doctor
+```
+
+Choose a unique backup filename in an existing, private folder on a filesystem
+that supports hard links, such as NTFS, APFS, or ext4. You can copy the finished
+archive to another filesystem. Clave asks for a separate passphrase in a hidden
+prompt. Use a strong, unique passphrase of at least 12 characters and keep it
+separate from the archive. Take a new backup after changes you need to recover.
+
+Restore writes a fresh vault with a new local key. It preserves entry IDs,
+values, and entry timestamps. Use a directory without existing vault files.
+To restore through the menu, start it with `clave --data-dir recovered-vault`
+and choose **Restore into this vault location**.
+If the original key or database is missing or damaged, leave those files in
+place and restore to a separate directory. Verify the restored entries before
+switching, then pass `--data-dir recovered-vault` to the CLI or use
+`Vault(data_dir="recovered-vault")` in Python.
+
+## 12. Troubleshooting
 
 | Symptom | Resolution |
 |---|---|
 | `clave` is not recognized | Use `python -m clave` with the interpreter where Clave is installed. |
 | Installation rejects your Python | Upgrade to Python 3.10 or newer. |
-| Vault does not exist yet | Store the first credential or secret; no init command is needed. |
-| Incomplete vault | Stop and check the selected root. Never regenerate a key for an existing database. |
+| No vault found | Save the first credential or secret, or choose the intended vault with `--data-dir`. |
+| Incomplete vault | Check the selected root and restore a backup to a fresh location if a vault file is missing. |
 | Entry does not exist | Check the exact case-sensitive topic and environment. |
 | Entry has a different type | Use `store` for credentials and `secret store` for standalone values. |
 | Interactive input unavailable | Run store in an interactive terminal or deliberately provide the value positionally. |
 | `get` does not show a password | Expected: terminal reads show metadata; Python API reads return values. |
-| Authentication or corruption error | Stop changing files and verify the selected root. V1 has no recovery tool. |
+| Authentication or corruption error | Verify the selected root and matching key. Restore a known-good backup to a fresh location if needed. |
 
-## 12. Security limits
+## 13. Security limits
 
 - Database-only theft does not reveal encrypted record payloads without the key.
 - Anyone with both files, or code running with your account's permissions, can decrypt records.
 - IDs, entry types, timestamps, database structure, and Fernet creation times remain visible.
-- Losing either file or corruption can permanently lose all records.
-- V1 has no backup/restore, recovery, rotation, OS keychain, cloud fallback, or secure CI secret delivery.
+- Losing either file or corruption can permanently lose records without a usable backup and passphrase.
+- Clave's local vault uses a file-based key. Key rotation, OS keychain support,
+  cloud fallback, and secure CI secret delivery are outside the current scope.
 
 See [SECURITY.md](SECURITY.md) for the full threat model, [README.md](README.md) for
 the project overview, and [PUBLISHING.md](PUBLISHING.md) for owner release steps.

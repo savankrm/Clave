@@ -16,6 +16,7 @@ def main() -> None:
         if len(sys.argv) > 2
         else [sys.executable, "-m", "clave"]
     )
+    legacy = "--legacy-0.1.0" in sys.argv[3:]
     assert Path(clave.__file__).is_relative_to(installed_root)
     with TemporaryDirectory() as directory:
         root = Path(directory).resolve()
@@ -24,6 +25,7 @@ def main() -> None:
             result = subprocess.run(
                 [*launcher, "--data-dir", str(root), *args],
                 cwd=root,
+                input="",
                 capture_output=True,
                 text=True,
                 timeout=45,
@@ -40,10 +42,12 @@ def main() -> None:
         assert "WARNING" in result.stderr
         assert "fake-smoke-password" not in result.stdout + result.stderr
         assert "fake-smoke-password" not in cli("get", "smoke.dev").stdout
-        assert (
-            "replaced"
-            in cli("store", "smoke.dev", "fake-user", "fake-smoke-password").stdout
-        )
+        replace = ("store", "smoke.dev", "fake-user", "fake-smoke-password")
+        if not legacy:
+            assert "--replace" in cli(*replace, success=False).stderr
+            replace += ("--replace",)
+            assert "Vault checks passed." in cli("doctor").stdout
+        assert "replaced" in cli(*replace).stdout
         assert "smoke.dev" in cli("list", "--env", "dev").stdout
         assert "smoke.dev" not in cli("list", "--env", "qa").stdout
         vault = Vault(root)
@@ -54,6 +58,14 @@ def main() -> None:
         cli("secret", "store", "regional_token.qa", "fake-smoke-token")
         assert vault.get_secret("regional_token.qa") == "fake-smoke-token"
         assert "environment: qa" in cli("secret", "get", "regional_token.qa").stdout
+        if not legacy:
+            archive = root / "backup.clave"
+            passphrase = "fake backup passphrase"
+            vault.backup(archive, passphrase)
+            recovered = Vault(root / "recovered")
+            recovered.restore(archive, passphrase)
+            assert recovered.get("smoke.dev").password == "fake-smoke-password"
+            assert recovered.get_secret("regional_token.qa") == "fake-smoke-token"
         cli("get", "regional_token.qa", success=False)
         cli("secret", "store", "smoke.dev", "fake-smoke-token", success=False)
         cli("store", "bad.id.extra", "fake-user", "fake-smoke-password", success=False)

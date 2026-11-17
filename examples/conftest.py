@@ -1,14 +1,15 @@
-"""Local automation example: populate your vault with store commands beforehand."""
+"""Give example tests a temporary vault populated with fake credentials."""
 
 import pytest
 
-from clave import Vault
-from clave.models import Credential
+from clave import Credential, Vault
 
 
 @pytest.fixture(scope="session")
-def vault() -> Vault:
-    return Vault()
+def vault(tmp_path_factory: pytest.TempPathFactory) -> Vault:
+    demo_vault = Vault(tmp_path_factory.mktemp("clave-example"))
+    demo_vault.store("db_user.dev", "demo-user", "demo-only-password")
+    return demo_vault
 
 
 @pytest.fixture(scope="session")
