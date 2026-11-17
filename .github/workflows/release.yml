@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@v6
@@ -95,7 +95,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@v6
@@ -108,7 +108,7 @@ jobs:
       - name: Install exact release from TestPyPI in a fresh environment
         run: |
           python -m venv .smoke
-          .smoke/bin/python -m pip install 'cryptography>=46' 'typer>=0.29,<0.30' 'platformdirs>=4'
+          .smoke/bin/python -m pip install 'cryptography>=50.0.2' 'typer>=0.28,<1.0' 'platformdirs>=4'
           .smoke/bin/python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: --dest downloaded 'clave==0.1.0'
           cmp dist/clave-0.1.0-py3-none-any.whl downloaded/clave-0.1.0-py3-none-any.whl
           .smoke/bin/python -m pip install --no-deps downloaded/*.whl

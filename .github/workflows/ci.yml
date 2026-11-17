@@ -11,7 +11,7 @@ jobs:
         python: ['3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
@@ -19,7 +19,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy --strict --python-version 3.10 src/clave
-      - run: pytest
+      - run: python -m pytest tests examples/test_sample_login.py
       - run: python -m build
       - run: python -m twine check --strict dist/*
       - run: python -m venv .smoke

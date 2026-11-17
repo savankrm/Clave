@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+env/
 .quality/
 .typecheck/
 .typecheck-legacy/
@@ -22,16 +23,21 @@ htmlcov/
 dist/
 release-dist/
 build/
+*.whl
 
 # Local credentials, vaults and databases
 .env
 .env.*
+.pypirc
 *.db
 *.db-*
 *.sqlite*
 *.clave
 *.vault
+*.enc
 *.key
+*.salt
+vault.json
 
 # Editor settings
 .idea/
