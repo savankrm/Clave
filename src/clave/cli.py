@@ -12,8 +12,9 @@ import typer
 from typer import _click as click
 from typer.core import TyperGroup
 
-from .exceptions import ClaveError
+from .exceptions import ClaveError, EntryAlreadyExists
 from .identifiers import identifier, nonblank, secret_identifier
+from .models import EntryType, StoreResult
 from .storage import RECOVERY
 from .vault import Vault
 
@@ -58,6 +59,11 @@ def friendly(fn: Callable[..., Any]) -> Callable[..., Any]:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
         try:
             return fn(*args, **kwargs)
+        except EntryAlreadyExists:
+            typer.echo(
+                "Error: Entry already exists. Use --replace to overwrite it.", err=True
+            )
+            raise typer.Exit(1) from None
         except (ClaveError, OSError) as exc:
             message = (
                 str(exc)
@@ -105,6 +111,32 @@ def value_or_prompt(value: str | None, label: str) -> str:
     return value
 
 
+def store_with_confirmation(
+    entry_id: str, kind: EntryType, replace: bool, write: Callable[[bool], StoreResult]
+) -> StoreResult:
+    try:
+        return write(replace)
+    except EntryAlreadyExists:
+        if not interactive():
+            raise
+        if not typer.confirm(
+            f"'{entry_id}' is already saved. Replace it with the new {kind}?",
+            default=False,
+        ):
+            typer.echo(f"Kept your saved {kind}.", err=True)
+            raise typer.Exit(1) from None
+    return write(True)
+
+
+def backup_passphrase(*, confirm: bool = False) -> str:
+    if not interactive():
+        raise typer.Abort()
+    passphrase: str = typer.prompt(
+        "Backup passphrase", hide_input=True, confirmation_prompt=confirm
+    )
+    return passphrase
+
+
 @app.command()
 @friendly
 def store(
@@ -112,10 +144,20 @@ def store(
     id: str,
     username: str,
     password: str | None = typer.Argument(None),
+    replace: bool = typer.Option(
+        False, "--replace", help="Replace an existing credential without asking."
+    ),
 ) -> None:
     identifier(id)
     nonblank(username)
-    result = vault(ctx).store(id, username, value_or_prompt(password, "Password"))
+    instance = vault(ctx)
+    password = value_or_prompt(password, "Password")
+    result = store_with_confirmation(
+        id,
+        "credential",
+        replace,
+        lambda allow: instance.store(id, username, password, allow_replace=allow),
+    )
     if result.vault_created:
         typer.echo("Vault created automatically. " + RECOVERY, err=True)
     typer.echo(f"Credential {result.action}: {id}")
@@ -139,6 +181,32 @@ def list_entries(ctx: typer.Context, env: str | None = typer.Option(None)) -> No
 
 @app.command()
 @friendly
+def doctor(ctx: typer.Context) -> None:
+    """Check the selected vault for problems without displaying its contents."""
+    vault(ctx).doctor()
+    typer.echo("Vault checks passed.")
+    if sys.platform == "win32":
+        typer.echo("Review vault folder access in Windows Security properties.")
+
+
+@app.command()
+@friendly
+def backup(ctx: typer.Context, path: Path) -> None:
+    """Save an encrypted backup to a new file."""
+    vault(ctx).backup(path, backup_passphrase(confirm=True))
+    typer.echo("Encrypted backup saved.")
+
+
+@app.command()
+@friendly
+def restore(ctx: typer.Context, path: Path) -> None:
+    """Restore an encrypted backup into a fresh vault."""
+    vault(ctx).restore(path, backup_passphrase())
+    typer.echo("Encrypted backup restored.")
+
+
+@app.command()
+@friendly
 def delete(
     ctx: typer.Context,
     id: str,
@@ -151,7 +219,7 @@ def delete(
         if not interactive():
             raise typer.Abort()
         typer.confirm(
-            f"Delete {id}? SQLite deletion is not forensic erasure.",
+            f"Delete {id}? Copies may remain in storage or backups.",
             default=False,
             abort=True,
         )
@@ -162,10 +230,22 @@ def delete(
 @secrets.command(name="store")
 @friendly
 def secret_store(
-    ctx: typer.Context, id: str, value: str | None = typer.Argument(None)
+    ctx: typer.Context,
+    id: str,
+    value: str | None = typer.Argument(None),
+    replace: bool = typer.Option(
+        False, "--replace", help="Replace an existing secret without asking."
+    ),
 ) -> None:
     secret_identifier(id)
-    result = vault(ctx).store_secret(id, value_or_prompt(value, "Value"))
+    instance = vault(ctx)
+    value = value_or_prompt(value, "Value")
+    result = store_with_confirmation(
+        id,
+        "secret",
+        replace,
+        lambda allow: instance.store_secret(id, value, allow_replace=allow),
+    )
     if result.vault_created:
         typer.echo("Vault created automatically. " + RECOVERY, err=True)
     typer.echo(f"Secret {result.action}: {id}")

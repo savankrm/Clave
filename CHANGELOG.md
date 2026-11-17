@@ -4,6 +4,11 @@
 
 ### Vault and CLI
 
+- Ask for confirmation before CLI overwrites. Use `--replace` to skip the prompt
+  or replace an entry from a script.
+- Add read-only vault diagnostics and passphrase-protected backup and restore to a fresh vault.
+- Explain missing vault files and deletion limits in plain language.
+
 - Create the SQLite schema, key check, and first vault entry in a single
   transaction. A failure before the commit attempt triggers cleanup of newly
   created files where possible. Each operation loads the vault key once.
@@ -15,6 +20,8 @@
 - Export `Vault`, public exceptions, and return types at the package root.
 
 ### Packaging, tests, and documentation
+
+- Clarify the TestPyPI release status and show a complete save-and-retrieve quick start.
 
 - Limit the source distribution to package code, tests, and essential build and
   licensing files. Expand Git ignore rules for local secret and build artifacts.

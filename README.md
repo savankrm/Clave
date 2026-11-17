@@ -1,26 +1,43 @@
-# Clave V1
+# Clave
 
-Clave is a local encrypted credential manager for Python developers. It supports
-Python 3.10 and newer on Windows, macOS, and Linux.
+**Keep secrets out of your Python code.**
 
-```console
-python -m pip install clave
-```
+Clave is a local encrypted vault for passwords and API tokens used in Python
+development and test automation. It supports Python 3.10 and newer on Windows,
+macOS, and Linux.
 
-The package is not published yet. For local review, install the built wheel:
-
-```console
-python -m pip install dist/clave-0.1.0-py3-none-any.whl
-clave --help
-```
+**Release status.** Version 0.1.0 is available for evaluation on
+[TestPyPI](https://test.pypi.org/project/clave/0.1.0/). Follow the [verified
+installation steps](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#1-install-clave)
+to install its dependencies and wheel in a clean environment. The replacement
+flag, doctor, backup, and restore commands below are available from this checkout.
 
 ## Quick start
 
-There is no setup or `init` command. The first successful store creates a random
-Fernet key and encrypted SQLite vault automatically.
+To try the current checkout, activate a virtual environment from the repository
+root and run:
 
 ```console
-clave store db_user.dev Username
+python -m pip install .
+clave store db_user.dev ExampleUser
+```
+
+Enter a password at the hidden prompt. The first successful store creates the
+vault automatically. Retrieve the credential from Python code running under the
+same user account:
+
+```python
+from clave import Vault
+
+credential = Vault().get("db_user.dev")
+username, password = credential.username, credential.password
+```
+
+Pass the values directly to your application and keep them out of logs.
+
+## Manage entries
+
+```console
 clave secret store api_token
 clave secret store api_token.qa
 clave get db_user.dev
@@ -39,9 +56,9 @@ clave secret store api_token example-token
 clave secret store api_token.qa qa-example-token
 ```
 
-Storing an existing ID replaces its complete value. For a credential, provide both
-the replacement username and password. For a standalone secret, provide the
-replacement value. There are no separate update commands.
+Run the store command again to replace an entry. Clave asks for confirmation in
+an interactive terminal. Type `y` to replace it or press Enter to keep what you
+saved. Use `--replace` to skip confirmation or to replace an entry in a script.
 
 ```console
 clave store db_user.dev NewUsername
@@ -56,11 +73,11 @@ Clave does not guess from argument count or value shape.
 Deletion asks for explicit Y/N confirmation and defaults to No:
 
 ```text
-Delete db_user.dev? SQLite deletion is not forensic erasure. [y/N]:
+Delete db_user.dev? Copies may remain in storage or backups. [y/N]:
 ```
 
 `clave delete db_user.dev --yes` bypasses confirmation for deliberate local
-scripts. SQLite deletion is not secure forensic erasure.
+scripts.
 
 ## Identifiers
 
@@ -158,10 +175,19 @@ visible. Encryption protects against theft of the database alone. Anyone with bo
 the key and database, or code running with the developer's permissions, can decrypt
 records. Separate files are not a separate trust boundary.
 
-Losing either file or corrupting it may permanently lose all records. V1 has no
-backup/restore, key recovery, rotation, keychain, cloud provider, environment-secret
-fallback, or secure CI/CD key-delivery workflow. See
-[SECURITY.md](https://github.com/savankrm/Clave/blob/main/SECURITY.md).
+Use `clave doctor` to check the local vault. Save a passphrase-protected backup
+before you need it and test the restore into a separate location:
+
+```console
+clave backup clave-backup.clave
+clave --data-dir recovered-vault restore clave-backup.clave
+clave --data-dir recovered-vault doctor
+```
+
+Keep the backup and passphrase in separate safe locations. Losing either vault
+file may permanently lose records without a usable backup. See the
+[recovery instructions](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#11-check-and-recover-your-vault)
+and [security model](https://github.com/savankrm/Clave/blob/main/SECURITY.md) for details.
 
 ## Development
 

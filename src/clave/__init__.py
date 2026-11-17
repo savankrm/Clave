@@ -1,7 +1,9 @@
 """Public interfaces for Clave's local credential vault."""
 
 from .exceptions import (
+    BackupError,
     ClaveError,
+    EntryAlreadyExists,
     EntryNotFound,
     EntryTypeMismatch,
     IncompleteVault,
@@ -16,8 +18,10 @@ from .models import Credential, EntryMetadata, StoreResult
 from .vault import Vault
 
 __all__ = [
+    "BackupError",
     "ClaveError",
     "Credential",
+    "EntryAlreadyExists",
     "EntryMetadata",
     "EntryNotFound",
     "EntryTypeMismatch",

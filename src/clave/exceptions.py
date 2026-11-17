@@ -37,5 +37,13 @@ class EntryNotFound(ClaveError):
     pass
 
 
+class EntryAlreadyExists(ClaveError):
+    pass
+
+
 class EntryTypeMismatch(ClaveError):
+    pass
+
+
+class BackupError(ClaveError):
     pass

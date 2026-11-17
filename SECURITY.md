@@ -1,6 +1,6 @@
 # Security model and limits
 
-Clave V1 protects record payloads if an attacker obtains only the SQLite database.
+Clave protects record payloads if an attacker obtains only the SQLite database.
 It does not protect against theft of both files, local-account compromise, malware,
 debuggers, hostile Python code, compromised sessions or memory inspection. File
 separation is not a trust boundary. Explicit API values are plaintext in memory.
@@ -33,14 +33,22 @@ CLI reads never intentionally emit passwords or secret values. Positional values
 can already be exposed by shell history/process listings before Clave starts.
 Python callers must not log plaintext returns or credential fields.
 
-**Losing either the key or database, or corrupting either, can irreversibly lose all
-records.** No backup/restore, key migration, rotation or recovery is implemented.
-Recovery tooling remains an accepted low-priority V2 risk. Never regenerate a key
-for an existing database. The schema, key check, and first entry commit in one
-SQLite transaction. On failure before the commit attempt, Clave tries to remove
+The first store commits the schema, key check, and entry in one SQLite transaction.
+Restore commits the schema, key check, and all recovered entries together. On
+failure before the commit attempt, Clave tries to remove
 only the files it created during that attempt. A crash or failed cleanup can
 still leave files that require owner inspection. Do not delete files containing
 valuable records in an attempt to reset the vault.
+
+**Losing the key or database, or corrupting either, can irreversibly lose records
+without a usable backup.** Backups from this checkout contain an authenticated,
+encrypted snapshot of entry data and metadata. A separate passphrase derives the
+archive encryption key using scrypt with a random salt. The archive envelope
+exposes its format, size, salt, and Fernet creation time. An attacker with a copy
+can attempt to guess the passphrase offline. Choose a strong, unique passphrase
+and store it separately from the archive. Clave cannot recover a forgotten
+passphrase. The original vault key is absent from the archive. Restore creates a
+new key in a fresh vault. See the [recovery guide](USER_GUIDE.md#11-check-and-recover-your-vault).
 
 There is no supported secure unattended CI/CD distribution/unlock solution, cloud
 fallback, OS keychain, passphrase or environment-secret injection. Prompt-free Python

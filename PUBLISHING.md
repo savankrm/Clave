@@ -121,7 +121,7 @@ Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 $reviewPython = 'E:\Clave\.smoke\testpypi-0.1.0\Scripts\python.exe'
 & $reviewPython -m pip install 'cryptography>=50.0.2' 'typer>=0.28,<1.0' 'platformdirs>=4'
 & $reviewPython -m pip install --index-url https://test.pypi.org/simple/ --no-deps 'clave==0.1.0'
-& $reviewPython scripts/smoke_wheel.py .smoke/testpypi-0.1.0 .smoke/testpypi-0.1.0/Scripts/clave.exe
+& $reviewPython scripts/smoke_wheel.py .smoke/testpypi-0.1.0 .smoke/testpypi-0.1.0/Scripts/clave.exe --legacy-0.1.0
 ```
 
 Confirm version 0.1.0 and the README, license and links on the TestPyPI project
