@@ -14,14 +14,14 @@ class Vault:
         self._storage = Storage(Paths.resolve(data_dir))
 
     @staticmethod
-    def _address(id: str, kind: EntryType) -> tuple[str, str]:
+    def _address(entry_id: str, kind: EntryType) -> tuple[str, str]:
         if kind == "secret":
-            return secret_identifier(id)
-        return identifier(id)
+            return secret_identifier(entry_id)
+        return identifier(entry_id)
 
-    def _read(self, id: str, kind: EntryType) -> dict[str, Any]:
-        topic, env = self._address(id, kind)
-        with self._storage.connection() as db:
+    def _read(self, entry_id: str, kind: EntryType) -> dict[str, Any]:
+        topic, env = self._address(entry_id, kind)
+        with self._storage.connection() as (db, fernet):
             row = db.execute(
                 "SELECT * FROM entries WHERE topic=? AND environment=?", (topic, env)
             ).fetchone()
@@ -29,7 +29,7 @@ class Vault:
                 raise EntryNotFound("Entry does not exist.")
             if row["entry_type"] != kind:
                 raise EntryTypeMismatch("Entry has a different type.")
-            payload = decrypt(self._storage.keys.load(), row["encrypted_payload"])
+            payload = decrypt(fernet, row["encrypted_payload"])
             fields = ("username", "password") if kind == "credential" else ("value",)
             if payload.get("kind") != kind or any(
                 not isinstance(payload.get(k), str) or not payload[k].strip()
@@ -47,23 +47,19 @@ class Vault:
 
     def _write(
         self,
-        id: str,
+        entry_id: str,
         kind: EntryType,
         payload: dict[str, Any],
     ) -> StoreResult:
-        topic, env = self._address(id, kind)
-        vault_created = self._storage.ensure_initialized()
-        with self._storage.connection() as db:
-            db.execute("BEGIN IMMEDIATE")
+        topic, env = self._address(entry_id, kind)
+        with self._storage.store_connection() as (db, fernet, vault_created):
             row = db.execute(
                 "SELECT entry_type FROM entries WHERE topic=? AND environment=?",
                 (topic, env),
             ).fetchone()
             if row is not None and row["entry_type"] != kind:
                 raise EntryTypeMismatch("Entry has a different type.")
-            token = encrypt(
-                self._storage.keys.load(), {"v": 1, "kind": kind, **payload}
-            )
+            token = encrypt(fernet, {"v": 1, "kind": kind, **payload})
             timestamp = now()
             db.execute(
                 """INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?)
@@ -90,7 +86,7 @@ class Vault:
     def list(self, env: str | None = None) -> list[EntryMetadata]:
         if env is not None:
             environment(env)
-        with self._storage.connection() as db:
+        with self._storage.connection() as (db, _):
             rows = db.execute(
                 "SELECT topic, environment, entry_type, created_at, updated_at FROM entries"
                 + (" WHERE environment=?" if env is not None else "")
@@ -114,7 +110,7 @@ class Vault:
 
     def delete(self, id: str) -> None:
         topic, env = secret_identifier(id)
-        with self._storage.connection() as db:
+        with self._storage.connection(write=True) as (db, _):
             if (
                 db.execute(
                     "DELETE FROM entries WHERE topic=? AND environment=?", (topic, env)

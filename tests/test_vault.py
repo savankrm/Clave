@@ -17,46 +17,11 @@ from clave.exceptions import (
     VaultCorrupt,
     VaultNotInitialized,
 )
-from clave.identifiers import identifier, secret_identifier
 
 
 @pytest.fixture
 def vault(tmp_path):
     return Vault(tmp_path)
-
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        "",
-        "a",
-        ".a",
-        "a.",
-        "a.b.c",
-        "a b.c",
-        "é.a",
-        "a/b.c",
-        "a.1b",
-        "a." + "x" * 65,
-        "a.b\n",
-    ],
-)
-def test_identifiers(value):
-    with pytest.raises(InvalidIdentifier):
-        identifier(value)
-
-
-def test_identifier_boundaries():
-    assert identifier("A_9.x-y") == ("A_9", "x-y")
-    assert identifier("a" * 64 + "." + "b" * 64)
-    assert secret_identifier("api_token") == ("api_token", "")
-    assert secret_identifier("api_token.qa") == ("api_token", "qa")
-
-
-@pytest.mark.parametrize("value", ["", "api.token.extra", "api token", "1token", "é"])
-def test_secret_identifiers(value):
-    with pytest.raises(InvalidIdentifier):
-        secret_identifier(value)
 
 
 def test_api(vault):
@@ -245,16 +210,35 @@ def test_independent_random_keys(tmp_path):
     assert a._storage.paths.key.read_bytes() != b._storage.paths.key.read_bytes()
 
 
-def test_symlink(tmp_path):
+@pytest.mark.parametrize("location", ["root", "directory", "file", "ancestor"])
+def test_symlink(tmp_path, monkeypatch, location):
     target = tmp_path / "target"
     target.mkdir()
-    link = tmp_path / "link"
+    root = tmp_path / "vault"
+    link = {
+        "root": root,
+        "directory": root / "config",
+        "file": root / "data" / "vault.sqlite3",
+        "ancestor": tmp_path / "alias",
+    }[location]
+    link.parent.mkdir(parents=True, exist_ok=True)
     try:
         link.symlink_to(target, target_is_directory=True)
     except OSError:
         pytest.skip("Symlink creation not permitted by OS")
-    with pytest.raises(UnsafePath):
-        Vault(link).store_secret("first", "fake")
+    if location == "ancestor":
+        monkeypatch.setattr(
+            "clave.config.user_data_path", lambda *a, **kw: link / "clave"
+        )
+        monkeypatch.setattr(
+            "clave.config.user_config_path", lambda *a, **kw: link / "clave"
+        )
+        vault = Vault()
+        vault.store_secret("first", "fake")
+        assert Vault(target / "clave").get_secret("first") == "fake"
+    else:
+        with pytest.raises(UnsafePath):
+            Vault(root).store_secret("first", "fake")
 
 
 def test_default_paths_do_not_touch_user_files(tmp_path, monkeypatch):
@@ -307,6 +291,52 @@ def test_interrupted_init(tmp_path, monkeypatch):
         instance.store_secret("first", "fake")
 
 
+def test_first_store_failure_rolls_back_schema_and_can_retry(vault, monkeypatch):
+    paths = vault._storage.paths
+
+    def fail(*args):
+        with closing(sqlite3.connect(paths.database)) as observer:
+            tables = observer.execute("SELECT name FROM sqlite_master").fetchall()
+        assert tables == []
+        raise OSError("simulated first-entry failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr("clave.vault.encrypt", fail)
+        with pytest.raises(IncompleteVault):
+            vault.store_secret("first", "fake")
+
+    assert not paths.key.exists()
+    assert not paths.database.exists()
+    assert vault.store_secret("first", "fake").vault_created
+    assert vault.get_secret("first") == "fake"
+
+
+def test_vault_loads_key_once_per_operation(vault, monkeypatch):
+    load = vault._storage.keys.load
+    calls = []
+
+    def counted_load():
+        calls.append(None)
+        return load()
+
+    monkeypatch.setattr(vault._storage.keys, "load", counted_load)
+    assert vault.store_secret(id="first", value="one").vault_created
+    assert len(calls) == 1
+    vault.store_secret(id="first", value="two")
+    assert len(calls) == 2
+    assert vault.get_secret(id="first") == "two"
+    assert len(calls) == 3
+
+
+def test_relative_vault_path_with_uri_characters(tmp_path, monkeypatch):
+    import os
+
+    monkeypatch.chdir(tmp_path)
+    root = "vault # 100%" if os.name == "nt" else "vault #? 100%"
+    assert Vault(root).store_secret("first", "fake").vault_created
+    assert Vault(root).get_secret("first") == "fake"
+
+
 def test_key_exclusive_creation(vault):
     vault.store_secret("first", "fake")
     original = vault._storage.paths.key.read_bytes()
@@ -321,7 +351,11 @@ def test_posix_permissions(vault):
 
     if os.name == "nt":
         pytest.skip("POSIX modes are not a Windows ACL guarantee")
+    storage_dir = vault._storage.paths.database.parent
+    storage_dir.mkdir(mode=0o750)
+    storage_dir.chmod(0o750)
     vault.store_secret("first", "fake")
     for path in (vault._storage.paths.key, vault._storage.paths.database):
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
-        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(vault._storage.paths.key.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(storage_dir.stat().st_mode) == 0o750

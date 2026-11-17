@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any
 
 import typer
+
+# Parser errors come from Typer's vendored Click, not standalone Click.
 from typer import _click as click
 from typer.core import TyperGroup
-from typer.exceptions import Abort
 
 from .exceptions import ClaveError
-from .identifiers import nonblank
+from .identifiers import identifier, nonblank, secret_identifier
 from .storage import RECOVERY
 from .vault import Vault
 
@@ -25,12 +26,19 @@ class SafeGroup(TyperGroup):
             if isinstance(result, int) and result != 0:
                 raise SystemExit(result)
             return result
+        except click.exceptions.MissingParameter as exc:
+            name = exc.param.name if exc.param is not None else None
+            label = {"id": "ID", "username": "USERNAME"}.get(name or "")
+            message = f"missing argument {label}" if label else "missing required input"
+            typer.echo(f"Error: {message}. Run clave --help.", err=True)
+            raise SystemExit(2) from None
         except click.ClickException:
+            # Parser messages may include raw arguments, including secrets.
             typer.echo(
                 "Error: invalid command or arguments. Run clave --help.", err=True
             )
             raise SystemExit(2) from None
-        except (Abort, EOFError, KeyboardInterrupt):
+        except (typer.Abort, EOFError, KeyboardInterrupt):
             typer.echo("Error: interactive input unavailable or cancelled.", err=True)
             raise SystemExit(1) from None
 
@@ -43,7 +51,6 @@ app = typer.Typer(
 )
 secrets = typer.Typer(help="Manage standalone secrets; values are never displayed.")
 app.add_typer(secrets, name="secret")
-_vault: Vault | None = None
 
 
 def friendly(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -65,17 +72,19 @@ def friendly(fn: Callable[..., Any]) -> Callable[..., Any]:
 
 @app.callback()
 def configure(
+    ctx: typer.Context,
     data_dir: Path | None = typer.Option(
         None, help="Isolated vault root (both key and database)."
     ),
 ) -> None:
-    global _vault
-    _vault = Vault(data_dir=data_dir)
+    ctx.obj = Vault(data_dir=data_dir)
 
 
-def vault() -> Vault:
-    assert _vault is not None
-    return _vault
+def vault(ctx: typer.Context) -> Vault:
+    instance = ctx.find_object(Vault)
+    if instance is None:
+        raise ClaveError("Vault context is unavailable.")
+    return instance
 
 
 def interactive() -> bool:
@@ -90,7 +99,7 @@ def value_or_prompt(value: str | None, label: str) -> str:
         )
     else:
         if not interactive():
-            raise Abort()
+            raise typer.Abort()
         value = typer.prompt(label, hide_input=True)
     nonblank(value)
     return value
@@ -98,8 +107,15 @@ def value_or_prompt(value: str | None, label: str) -> str:
 
 @app.command()
 @friendly
-def store(id: str, username: str, password: str | None = typer.Argument(None)) -> None:
-    result = vault().store(id, username, value_or_prompt(password, "Password"))
+def store(
+    ctx: typer.Context,
+    id: str,
+    username: str,
+    password: str | None = typer.Argument(None),
+) -> None:
+    identifier(id)
+    nonblank(username)
+    result = vault(ctx).store(id, username, value_or_prompt(password, "Password"))
     if result.vault_created:
         typer.echo("Vault created automatically. " + RECOVERY, err=True)
     typer.echo(f"Credential {result.action}: {id}")
@@ -107,8 +123,8 @@ def store(id: str, username: str, password: str | None = typer.Argument(None)) -
 
 @app.command()
 @friendly
-def get(id: str) -> None:
-    credential = vault().get(id)
+def get(ctx: typer.Context, id: str) -> None:
+    credential = vault(ctx).get(id)
     typer.echo(
         f"id: {id}\nenvironment: {id.split('.')[1]}\ntype: credential\nusername: {credential.username}"
     )
@@ -116,35 +132,40 @@ def get(id: str) -> None:
 
 @app.command(name="list")
 @friendly
-def list_entries(env: str | None = typer.Option(None)) -> None:
-    for entry in vault().list(env):
+def list_entries(ctx: typer.Context, env: str | None = typer.Option(None)) -> None:
+    for entry in vault(ctx).list(env):
         typer.echo(f"{entry.id}\t{entry.entry_type}")
 
 
 @app.command()
 @friendly
 def delete(
+    ctx: typer.Context,
     id: str,
     yes: bool = typer.Option(
         False, "--yes", help="Bypass interactive deletion confirmation."
     ),
 ) -> None:
+    secret_identifier(id)
     if not yes:
         if not interactive():
-            raise Abort()
+            raise typer.Abort()
         typer.confirm(
             f"Delete {id}? SQLite deletion is not forensic erasure.",
             default=False,
             abort=True,
         )
-    vault().delete(id)
+    vault(ctx).delete(id)
     typer.echo(f"Entry deleted: {id}")
 
 
 @secrets.command(name="store")
 @friendly
-def secret_store(id: str, value: str | None = typer.Argument(None)) -> None:
-    result = vault().store_secret(id, value_or_prompt(value, "Value"))
+def secret_store(
+    ctx: typer.Context, id: str, value: str | None = typer.Argument(None)
+) -> None:
+    secret_identifier(id)
+    result = vault(ctx).store_secret(id, value_or_prompt(value, "Value"))
     if result.vault_created:
         typer.echo("Vault created automatically. " + RECOVERY, err=True)
     typer.echo(f"Secret {result.action}: {id}")
@@ -152,7 +173,7 @@ def secret_store(id: str, value: str | None = typer.Argument(None)) -> None:
 
 @secrets.command(name="get")
 @friendly
-def secret_get(id: str) -> None:
-    vault().get_secret(id)
+def secret_get(ctx: typer.Context, id: str) -> None:
+    vault(ctx).get_secret(id)
     scope = "scope: global" if "." not in id else f"environment: {id.split('.')[1]}"
     typer.echo(f"id: {id}\n{scope}\ntype: secret")
