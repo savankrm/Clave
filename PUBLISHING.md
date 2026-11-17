@@ -90,8 +90,9 @@ allows rehearsal before the workflow has been merged to the default branch.
 GitHub requires a workflow_dispatch workflow to exist on the default branch before
 it can be manually dispatched. Later rehearsals can use the manual testpypi input.
 
-The workflow builds once on Ubuntu/Python 3.10, runs lint, formatting, strict mypy,
-tests with coverage, build, Twine, archive checks and installed-wheel smoke testing.
+The workflow builds on Ubuntu and Python 3.10, checks the distribution metadata
+and archive contents, and smoke-tests the installed wheel. Review the full CI
+matrix on the pull request before approving a release.
 It retains both distributions as the `clave-distributions` artifact for 30 days.
 The build job has read-only contents access. Only upload jobs receive OIDC access.
 
@@ -100,10 +101,10 @@ hashes, then approve its `testpypi` deployment under Review deployments. This up
 publicly to TestPyPI through Trusted Publishing. The `pypi` job is skipped for
 release-branch pushes.
 
-After upload, the workflow creates a clean virtual environment, installs runtime
-dependencies from PyPI, downloads exactly `clave==0.1.0` from TestPyPI with
-`--no-deps`, compares its wheel byte-for-byte with the retained artifact, installs
-it and runs the native CLI/API smoke script. Avoid an extra-index-url combination
+After upload, the workflow creates a clean virtual environment and downloads
+exactly `clave==0.1.0` from TestPyPI with `--no-deps`. It compares the wheel with
+the retained artifact, installs it with dependencies from PyPI, and runs the
+native CLI/API smoke script. Avoid an extra-index-url combination
 when validating which index supplied Clave.
 
 If indexing has not completed, rerun the failed verification job after the package

@@ -4,6 +4,8 @@
 
 ### Vault and CLI
 
+- Open the interactive vault menu when `clave` runs without a command in a terminal.
+- Show asterisks as users type credential passwords in the CLI and the menu.
 - Ask for confirmation before CLI overwrites. Use `--replace` to skip the prompt
   or replace an entry from a script.
 - Add read-only vault diagnostics and passphrase-protected backup and restore to a fresh vault.

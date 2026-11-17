@@ -30,6 +30,7 @@ dependencies = [
     "cryptography>=50.0.2",
     "typer>=0.28,<1.0",
     "platformdirs>=4",
+    "prompt-toolkit>=3.0.52,<4",
 ]
 
 [project.urls]

@@ -25,6 +25,7 @@ def main() -> None:
             result = subprocess.run(
                 [*launcher, "--data-dir", str(root), *args],
                 cwd=root,
+                input="",
                 capture_output=True,
                 text=True,
                 timeout=45,

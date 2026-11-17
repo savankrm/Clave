@@ -1,4 +1,10 @@
+from io import StringIO
+
 import pytest
+from prompt_toolkit.application import create_app_session
+from prompt_toolkit.data_structures import Size
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output.vt100 import Vt100_Output
 from typer.testing import CliRunner
 
 from clave import Vault
@@ -13,6 +19,22 @@ def cli(tmp_path):
         return runner.invoke(app, ["--data-dir", str(tmp_path), *args], **kwargs)
 
     return run
+
+
+@pytest.fixture
+def password_terminal(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm")
+    displayed = StringIO()
+    with (
+        create_pipe_input() as keyboard,
+        create_app_session(
+            input=keyboard,
+            output=Vt100_Output(
+                displayed, lambda: Size(rows=24, columns=80), enable_cpr=False
+            ),
+        ),
+    ):
+        yield keyboard, displayed
 
 
 def test_cli_metadata(cli):
@@ -56,13 +78,18 @@ def test_secret_commands(cli):
     assert "api_token.qa" in cli(["list", "--env", "qa"]).output
 
 
-def test_hidden_prompts(cli, monkeypatch, tmp_path):
+def test_hidden_prompts(cli, monkeypatch, tmp_path, password_terminal):
     monkeypatch.setattr("clave.cli.interactive", lambda: True)
-    result = cli(["store", "db.dev", "fake-user"], input="HIDDEN-FAKE-PASSWORD\n")
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    keyboard, displayed = password_terminal
+    keyboard.send_text("HIDDEN-FAKE-PASSWORX\x7fD\r")
+    result = cli(["store", "db.dev", "fake-user"])
     assert result.exit_code == 0, result.output
-    assert "HIDDEN-FAKE" not in result.output
-    assert "Password:" in result.output
-    result = cli(["store", "db.dev", "other"], input="new-fake\ny\n")
+    assert "HIDDEN-FAKE" not in result.output + displayed.getvalue()
+    assert "Password: ********************" in displayed.getvalue()
+    assert Vault(tmp_path).get("db.dev").password == "HIDDEN-FAKE-PASSWORD"
+    keyboard.send_text("new-fake\r")
+    result = cli(["store", "db.dev", "other"], input="y\n")
     assert result.exit_code == 0, result.output
     assert (
         "'db.dev' is already saved. Replace it with the new credential? [y/N]"
@@ -93,6 +120,29 @@ def test_hidden_prompts(cli, monkeypatch, tmp_path):
     assert "[y/N]" in cli(["delete", "db.dev"], input="n\n").output
     assert cli(["get", "db.dev"]).exit_code == 0
     assert cli(["delete", "db.dev"], input="y\n").exit_code == 0
+
+
+def test_password_prompt_interrupt_does_not_save(
+    cli, monkeypatch, tmp_path, password_terminal
+):
+    monkeypatch.setattr("clave.cli.interactive", lambda: True)
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    keyboard, displayed = password_terminal
+    keyboard.send_text("UNSAVED-FAKE-PASSWORD\x03")
+    result = cli(["store", "db.dev", "fake-user"])
+    assert result.exit_code == 1
+    assert "UNSAVED-FAKE-PASSWORD" not in result.output + displayed.getvalue()
+    assert not (tmp_path / "data").exists()
+
+
+def test_password_stays_hidden_in_dumb_terminal(cli, monkeypatch, tmp_path):
+    monkeypatch.setattr("clave.cli.interactive", lambda: True)
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    monkeypatch.setenv("TERM", "dumb")
+    result = cli(["store", "db.dev", "fake-user"], input="FAKE-PASSWORD\n")
+    assert result.exit_code == 0, result.output
+    assert "FAKE-PASSWORD" not in result.output
+    assert Vault(tmp_path).get("db.dev").password == "FAKE-PASSWORD"
 
 
 def test_noninteractive(cli):
@@ -131,6 +181,7 @@ def test_nested_invocation_keeps_its_own_vault(tmp_path, monkeypatch):
             app, ["--data-dir", str(second), "secret", "get", "entry"]
         )
         assert result.exit_code == 0, result.output
+        return True
 
     monkeypatch.setattr("clave.cli.interactive", lambda: True)
     monkeypatch.setattr("clave.cli.typer.confirm", confirm)
@@ -166,6 +217,87 @@ def test_parser_does_not_echo(cli):
 
 def test_help():
     assert CliRunner().invoke(app, ["--help"]).exit_code == 0
+
+
+def test_menu_only_opens_without_a_command_in_a_terminal(cli, monkeypatch):
+    result = cli([])
+    assert result.exit_code == 2
+    assert "Usage:" in result.output
+    assert "Choose an action" not in result.output
+
+    monkeypatch.setattr("clave.cli.interactive", lambda: True)
+    result = cli([])
+    assert result.exit_code == 2
+    assert "Usage:" in result.output
+    assert "Choose an action" not in result.output
+
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    result = cli(["--help"])
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
+    assert "Choose an action" not in result.output
+
+
+def test_menu_manages_entries(cli, tmp_path, monkeypatch, password_terminal):
+    monkeypatch.setattr("clave.cli.interactive", lambda: True)
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    keyboard, displayed = password_terminal
+    keyboard.send_text("FAKE-PASSWORD\r")
+    result = cli(
+        [],
+        input=(
+            "11\n7\n1\ndb.dev\nfake-user\n"
+            "2\napi_token.qa\nFAKE-TOKEN\n"
+            "2\napi_token.qa\nFAKE-REPLACEMENT\nn\n"
+            "3\nqa\n3\n\n4\ndb.dev\n5\napi_token.qa\n"
+            "6\napi_token.qa\nn\n6\ndb.dev\ny\n7\n0\n"
+        ),
+    )
+    assert result.exit_code == 0, result.output
+    assert "Choose a number from 0 to 9." in result.output
+    assert "No vault found" in result.output
+    assert "Credential created: db.dev" in result.output
+    assert "Secret created: api_token.qa" in result.output
+    assert "Kept your saved secret." in result.output
+    assert "api_token.qa\tsecret" in result.output
+    assert "db.dev\tcredential" in result.output
+    assert "username: fake-user" in result.output
+    assert "type: secret" in result.output
+    assert "Kept your saved entry." in result.output
+    assert "Entry deleted: db.dev" in result.output
+    assert "Vault checks passed." in result.output
+    assert "Password: *************" in displayed.getvalue()
+    assert "FAKE-" not in result.output + displayed.getvalue()
+    vault = Vault(tmp_path)
+    assert [entry.id for entry in vault.list()] == ["api_token.qa"]
+    assert vault.get_secret("api_token.qa") == "FAKE-TOKEN"
+
+
+def test_menu_backup_and_restore(tmp_path, monkeypatch):
+    monkeypatch.setattr("clave.cli.interactive", lambda: True)
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    runner = CliRunner()
+    source, target = tmp_path / "source", tmp_path / "target"
+    archive = tmp_path / "recovery copy.clave"
+    password = "fake recovery passphrase"
+    Vault(source).store_secret("token", "fake secret")
+
+    result = runner.invoke(
+        app,
+        ["--data-dir", str(source)],
+        input=f"8\n{archive}\n{password}\n{password}\n0\n",
+    )
+    assert result.exit_code == 0, result.output
+    assert "Encrypted backup saved." in result.output
+    assert password not in result.output
+
+    result = runner.invoke(
+        app, ["--data-dir", str(target)], input=f"9\n{archive}\n{password}\n0\n"
+    )
+    assert result.exit_code == 0, result.output
+    assert "Encrypted backup restored." in result.output
+    assert password not in result.output
+    assert Vault(target).get_secret("token") == "fake secret"
 
 
 def test_recovery_commands(tmp_path, monkeypatch):

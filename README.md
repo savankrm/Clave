@@ -9,8 +9,8 @@ macOS, and Linux.
 **Release status.** Version 0.1.0 is available for evaluation on
 [TestPyPI](https://test.pypi.org/project/clave/0.1.0/). Follow the [verified
 installation steps](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#1-install-clave)
-to install its dependencies and wheel in a clean environment. The replacement
-flag, doctor, backup, and restore commands below are available from this checkout.
+to install its dependencies and wheel in a clean environment. This checkout adds
+an interactive menu, overwrite confirmation, diagnostics, backup, and restore.
 
 ## Quick start
 
@@ -22,9 +22,9 @@ python -m pip install .
 clave store db_user.dev ExampleUser
 ```
 
-Enter a password at the hidden prompt. The first successful store creates the
-vault automatically. Retrieve the credential from Python code running under the
-same user account:
+Enter a password at the prompt. Clave shows asterisks as you type. The first
+successful store creates the vault automatically. Retrieve the credential from
+Python code running under the same user account:
 
 ```python
 from clave import Vault
@@ -36,6 +36,8 @@ username, password = credential.username, credential.password
 Pass the values directly to your application and keep them out of logs.
 
 ## Manage entries
+
+Run `clave` in a terminal to open the menu. You can also run each command directly:
 
 ```console
 clave secret store api_token
@@ -200,7 +202,8 @@ pytest
 python -m build
 ```
 
-CI runs the suite on Python 3.10 through 3.15 on Windows, macOS, and Linux. See
+Pull request CI runs the suite on Python 3.10 through 3.15 on Windows, macOS, and
+Linux. A push checks that Clave installs and that `clave --help` runs. See
 [USER_GUIDE.md](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md) for the
 complete manual,
 [PUBLISHING.md](https://github.com/savankrm/Clave/blob/main/PUBLISHING.md) for owner

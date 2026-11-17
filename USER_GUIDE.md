@@ -31,6 +31,11 @@ for installation and execution.
 
 ## 2. Store your first credential
 
+Run `clave` in a terminal and choose **Save a credential**. The menu also lets you
+save and inspect secrets, list entries, delete entries, check vault health, and
+back up or restore. Choose **0** to exit. You can use the direct commands in this
+guide from the same terminal.
+
 No separate initialization is required. Your first successful store automatically
 creates the random encryption key and database for your user account:
 
@@ -38,8 +43,9 @@ creates the random encryption key and database for your user account:
 clave store db_user.dev ExampleUser
 ```
 
-Enter the password at the hidden `Password:` prompt. Clave reports that it created
-the vault and credential. Future commands reuse that vault without an unlock prompt.
+The `Password:` prompt shows an asterisk for each character you type. Clave
+reports that it created the vault and credential. Future commands reuse that
+vault without an unlock prompt.
 
 Installation itself does not create user files. Python package installers may run
 in isolated build environments, as an administrator, or for a different user.
@@ -281,6 +287,8 @@ separate from the archive. Take a new backup after changes you need to recover.
 
 Restore writes a fresh vault with a new local key. It preserves entry IDs,
 values, and entry timestamps. Use a directory without existing vault files.
+To restore through the menu, start it with `clave --data-dir recovered-vault`
+and choose **Restore into this vault location**.
 If the original key or database is missing or damaged, leave those files in
 place and restore to a separate directory. Verify the restored entries before
 switching, then pass `--data-dir recovered-vault` to the CLI or use

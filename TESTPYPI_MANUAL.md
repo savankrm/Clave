@@ -42,7 +42,7 @@ created later is a separate folder containing an isolated package installation.
 
 ```text
 Code pushed to the release branch
-  -> checks workflow tests Windows, macOS and Linux
+  -> checks workflow smoke-tests the CLI
   -> release rehearsal builds installable files
   -> testpypi environment waits for a person's approval
   -> approved files upload to TestPyPI
@@ -77,7 +77,7 @@ Open each file below to read its contents. Return using the browser's Back butto
 
 | File | Displayed workflow | Function |
 |---|---|---|
-| ci.yml | checks | Runs code checks and compatibility tests |
+| ci.yml | checks | Smoke-tests pushes and runs the full matrix on pull requests |
 | release.yml | release rehearsal | Builds files, uploads to TestPyPI after approval, then verifies installation |
 
 These files contain YAML, a text format for workflow settings. The maintainer
@@ -91,9 +91,9 @@ and confirm it was pushed.
 
 **Purpose:** Know what each result proves before approving the package upload.
 
-Click **Actions** at the top, select **checks** on the left, and open a run for
-the release branch. Its test job is repeated for Python 3.10 through 3.15 on
-Windows, macOS and Linux, giving 18 combinations.
+Click **Actions** at the top, select **checks** on the left, and open a pull request
+run. Its test job is repeated for Python 3.10 through 3.15 on Windows, macOS and
+Linux, giving 18 combinations. A push run verifies installation and `clave --help`.
 
 Click a job such as **test (windows-latest, 3.10)** to expand its steps.
 
@@ -114,7 +114,7 @@ Now select **release rehearsal** on the left. It has these jobs.
 
 | Job | Function and dependency |
 |---|---|
-| build | Runs checks on Ubuntu/Python 3.10, builds files and saves the artifact |
+| build | Builds, inspects and smoke-tests the package on Ubuntu and Python 3.10 |
 | testpypi | Waits for build and environment approval, then uploads |
 | verify-testpypi | Waits for upload, then downloads, compares, installs and tests the wheel |
 | pypi | Later production promotion, eligible only for a manual pypi run on main |
@@ -281,7 +281,7 @@ default branch. When available, choose the release branch and destination testpy
 
 ## Step 10 — Wait for the build
 
-**Purpose:** The build tests the code and checks the package before uploading it.
+**Purpose:** The build inspects the archives and smoke-tests the installed wheel before upload.
 
 Click **build** to watch progress. Wait for its green check mark.
 Queued means it is waiting for a GitHub computer. In progress means it is running.
