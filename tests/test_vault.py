@@ -108,6 +108,7 @@ def test_init_states(tmp_path):
     with pytest.raises(IncompleteVault):
         v.get_secret("x")
     key.write_bytes(Fernet.generate_key())
+    key.chmod(0o600)
     with pytest.raises(VaultCorrupt):
         v.list()
     key.write_bytes(b"invalid")
@@ -135,7 +136,7 @@ def test_encryption_and_tampering(vault):
 
 
 def test_corrupt_metadata(vault):
-    vault.store("first.dev", "fake-user", "fake")
+    vault.store_secret("first", "fake")
     with closing(sqlite3.connect(vault._storage.paths.database)) as db, db:
         db.execute("DELETE FROM vault_meta")
     with pytest.raises(VaultCorrupt):
@@ -360,7 +361,7 @@ def test_posix_permissions(vault):
     assert not vault._storage.paths.key.exists()
     assert not vault._storage.paths.database.exists()
     storage_dir.chmod(0o700)
-    vault.store_secret("first", "fake")
+    vault.store("first.dev", "fake-user", "fake")
     for path in (vault._storage.paths.key, vault._storage.paths.database):
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert stat.S_IMODE(vault._storage.paths.key.parent.stat().st_mode) == 0o700
