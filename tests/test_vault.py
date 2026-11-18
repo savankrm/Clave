@@ -108,6 +108,7 @@ def test_init_states(tmp_path):
     with pytest.raises(IncompleteVault):
         v.get_secret("x")
     key.write_bytes(Fernet.generate_key())
+    key.chmod(0o600)
     with pytest.raises(VaultCorrupt):
         v.list()
     key.write_bytes(b"invalid")
@@ -354,8 +355,24 @@ def test_posix_permissions(vault):
     storage_dir = vault._storage.paths.database.parent
     storage_dir.mkdir(mode=0o750)
     storage_dir.chmod(0o750)
-    vault.store_secret("first", "fake")
+    with pytest.raises(IncompleteVault, match="permissions are too broad"):
+        vault.store_secret("first", "fake")
+    assert stat.S_IMODE(storage_dir.stat().st_mode) == 0o750
+    assert not vault._storage.paths.key.exists()
+    assert not vault._storage.paths.database.exists()
+    storage_dir.chmod(0o700)
+    vault.store("first.dev", "fake-user", "fake")
     for path in (vault._storage.paths.key, vault._storage.paths.database):
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert stat.S_IMODE(vault._storage.paths.key.parent.stat().st_mode) == 0o700
-    assert stat.S_IMODE(storage_dir.stat().st_mode) == 0o750
+    assert stat.S_IMODE(storage_dir.stat().st_mode) == 0o700
+
+    key = vault._storage.paths.key
+    key.chmod(0o644)
+    with pytest.raises(IncompleteVault, match="chmod go-rwx"):
+        vault.get("first.dev")
+    with pytest.raises(IncompleteVault, match="chmod go-rwx"):
+        vault.store("first.dev", "fake-user", "changed")
+    assert stat.S_IMODE(key.stat().st_mode) == 0o644
+    key.chmod(0o600)
+    assert vault.get("first.dev").password == "fake"

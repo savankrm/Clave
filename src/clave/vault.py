@@ -159,7 +159,6 @@ class Vault:
     def doctor(self) -> None:
         """Check vault integrity and permissions without changing stored data."""
         with self._storage.connection() as (db, fernet):
-            self._storage.check_permissions()
             if [row[0] for row in db.execute("PRAGMA integrity_check")] != ["ok"]:
                 raise VaultCorrupt("Vault database failed its integrity check.")
             for _ in self._snapshot_entries(db, fernet):

@@ -50,21 +50,18 @@ class Storage:
             )
         return bool(present)
 
-    def check_permissions(self) -> None:
+    def _check_permissions(self, *, include_files: bool = True) -> None:
         if os.name == "nt":
             return
         paths = self.paths
-        for path in (
-            *paths.roots,
-            paths.key.parent,
-            paths.database.parent,
-            paths.key,
-            paths.database,
-        ):
+        private_paths = (*paths.roots, paths.key.parent, paths.database.parent)
+        if include_files:
+            private_paths += (paths.key, paths.database)
+        for path in private_paths:
             if path.stat().st_mode & 0o077:
                 raise IncompleteVault(
                     f"Vault permissions are too broad on {path.name}. "
-                    "Restrict access to your account and rerun clave doctor."
+                    "Use chmod go-rwx on that vault path, then run clave doctor."
                 )
 
     @contextmanager
@@ -85,6 +82,7 @@ class Storage:
         try:
             private_dir(self.paths.key.parent)
             private_dir(self.paths.database.parent)
+            self._check_permissions(include_files=False)
             self.keys.create()
             created.append(self.paths.key)
             fd = os.open(
@@ -134,6 +132,7 @@ class Storage:
             raise VaultNotInitialized(
                 "No vault found. Save your first credential or secret to create one."
             )
+        self._check_permissions()
         db: sqlite3.Connection | None = None
         try:
             db = sqlite3.connect(

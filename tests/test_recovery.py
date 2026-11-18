@@ -113,7 +113,8 @@ def test_restore_refuses_partial_vault_and_rolls_back_failed_write(
     source.backup(archive, PASSPHRASE)
     restored = Vault(tmp_path / "target")
     paths = restored._storage.paths
-    paths.key.parent.mkdir(parents=True)
+    paths.roots[0].mkdir(mode=0o700)
+    paths.key.parent.mkdir(mode=0o700)
     paths.key.write_bytes(b"original")
     with pytest.raises(IncompleteVault, match="database file is missing"):
         restored.restore(archive, PASSPHRASE)
