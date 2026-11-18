@@ -1,6 +1,7 @@
 """Versioned, authenticated archives protected by a separate passphrase."""
 
 import base64
+import errno
 import os
 import stat
 import tempfile
@@ -55,7 +56,11 @@ def write_archive(path: Path, passphrase: str, entries: list[dict[str, Any]]) ->
                 temporary.unlink()
     except FileExistsError:
         raise BackupError("A file already exists at the backup destination.") from None
-    except OSError:
+    except OSError as exc:
+        if exc.errno == errno.ENOSPC:
+            raise BackupError(
+                "Not enough space to write the backup. Free some space or choose another folder."
+            ) from None
         raise BackupError(
             "Could not write the backup. Choose a writable folder on a filesystem "
             "that supports hard links."

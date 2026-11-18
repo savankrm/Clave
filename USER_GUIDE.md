@@ -8,15 +8,11 @@ Clave supports Python 3.10 and newer on Windows, macOS, and Linux.
 
 ## 1. Install Clave
 
-Once 0.2.0 is on PyPI, install it from an active virtual environment:
+### TestPyPI beta
 
-```console
-python -m pip install clave==0.2.0
-clave --help
-```
-
-For a TestPyPI rehearsal, download the exact 0.2.0 wheel from TestPyPI and install
-it locally so dependencies come from production PyPI:
+In a fresh virtual environment, download the published 0.2.0 wheel from
+TestPyPI. Install that wheel so pip gets its dependencies from the usual
+package index.
 
 ```console
 python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.0
@@ -24,10 +20,25 @@ python -m pip install ./clave-0.2.0-py3-none-any.whl
 clave --help
 ```
 
-To try the checkout, install from the repository root in a separate virtual environment:
+For the 0.2.1 rehearsal, use `0.2.1` in both commands after the
+[TestPyPI upload](https://test.pypi.org/project/clave/) completes.
+
+### Source checkout
+
+From the repository root in a separate virtual environment, run:
 
 ```console
 python -m pip install .
+clave --help
+```
+
+### Production PyPI
+
+After Clave is published to production PyPI, install it from an active virtual
+environment.
+
+```console
+python -m pip install clave
 clave --help
 ```
 
@@ -146,6 +157,8 @@ clave secret get api_token
 clave secret get api_token.qa
 clave list
 clave list --env dev
+clave find github
+clave find github --env qa
 ```
 
 Terminal reads display metadata only. Credential inspection shows ID, environment,
@@ -154,6 +167,23 @@ IDs and types. Global secret metadata says `scope: global`; scoped secret metada
 shows its environment. Passwords and secret values are never displayed by the CLI.
 An unfiltered list includes both secret scopes. `list --env dev` includes only
 credentials and scoped secrets for `dev`, excluding global secrets.
+
+Search matches any part of a credential or secret name, ignoring case. In the
+menu, choose **View entries** and type part of a name. Press Enter instead to
+browse with the usual optional environment filter.
+
+### Copy a credential password
+
+```console
+clave copy db_user.dev
+```
+
+This explicit command copies the password to your local system clipboard
+without printing it. Use it in a desktop session where you trust clipboard
+access. Clipboard history or sync may retain the password.
+
+On Windows and macOS, Clave uses the system clipboard tools. On Linux, use
+`wl-copy` in a Wayland session or `xclip` or `xsel` in an X11 session.
 
 ## 7. Retrieve values in Python
 
@@ -287,8 +317,9 @@ clave --data-dir recovered-vault doctor
 Choose a unique backup filename in an existing, private folder on a filesystem
 that supports hard links, such as NTFS, APFS, or ext4. You can copy the finished
 archive to another filesystem. Clave asks for a separate passphrase in a hidden
-prompt. Use a strong, unique passphrase of at least 12 characters and keep it
-separate from the archive. Take a new backup after changes you need to recover.
+prompt. Twelve characters is the minimum. Create a long, unique passphrase with
+a password manager and keep it separate from the archive. Take a new backup
+after changes you need to recover.
 
 Restore writes a fresh vault with a new local key. It preserves entry IDs,
 values, and entry timestamps. Use a directory without existing vault files.

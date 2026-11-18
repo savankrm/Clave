@@ -78,6 +78,44 @@ def test_secret_commands(cli):
     assert "api_token.qa" in cli(["list", "--env", "qa"]).output
 
 
+def test_find_matches_names_and_preserves_environment_filter(cli, tmp_path):
+    vault = Vault(tmp_path)
+    vault.store_secret("github_token", "FAKE-TOKEN")
+    vault.store_secret("Github_token.qa", "FAKE-SCOPED-TOKEN")
+    vault.store("database.dev", "github-user", "FAKE-PASSWORD")
+
+    result = cli(["find", " GITHUB "])
+    assert result.exit_code == 0, result.output
+    assert set(result.stdout.splitlines()) == {
+        "github_token\tsecret",
+        "Github_token.qa\tsecret",
+    }
+    scoped = cli(["find", "github", "--env", "qa"])
+    assert scoped.exit_code == 0, scoped.output
+    assert scoped.stdout.strip() == "Github_token.qa\tsecret"
+    assert "No matching entries." in cli(["find", "database-missing"]).stdout
+    assert cli(["find", " "]).exit_code == 1
+
+
+def test_copy_sends_only_the_credential_password(cli, tmp_path, monkeypatch):
+    copied = []
+    monkeypatch.setattr("clave.cli.copy_password", copied.append)
+    vault = Vault(tmp_path)
+    value = "FAKE-CLIPBOARD-PASSWORD"
+    vault.store("database.dev", "fake-user", value)
+    vault.store_secret("github_token.qa", "FAKE-SECRET-TOKEN")
+    result = cli(["copy", "database.dev"])
+    assert result.exit_code == 0, result.output
+    assert copied == [value]
+    assert "Password copied to the clipboard." in result.stdout
+    assert "Clipboard history or sync" in result.stderr
+    assert value not in result.output
+    assert "fake-user" not in result.output
+    assert cli(["copy", "github_token.qa"]).exit_code == 1
+    assert cli(["copy", "missing.dev"]).exit_code == 1
+    assert copied == [value]
+
+
 def test_hidden_prompts(cli, monkeypatch, tmp_path, password_terminal):
     monkeypatch.setattr("clave.cli.interactive", lambda: True)
     monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
@@ -249,7 +287,7 @@ def test_menu_manages_entries(cli, tmp_path, monkeypatch, password_terminal):
             "11\n7\n1\ndb.dev\nfake-user\n"
             "2\napi_token.qa\nFAKE-TOKEN\n"
             "2\napi_token.qa\nFAKE-REPLACEMENT\nn\n"
-            "3\nqa\n3\n\n4\ndb.dev\n5\napi_token.qa\n"
+            "3\nAPI_TOKEN\n3\n\nqa\n3\n\n\n4\ndb.dev\n5\napi_token.qa\n"
             "6\napi_token.qa\nn\n6\ndb.dev\ny\n7\n0\n"
         ),
     )
@@ -259,6 +297,8 @@ def test_menu_manages_entries(cli, tmp_path, monkeypatch, password_terminal):
     assert "Credential created: db.dev" in result.output
     assert "Secret created: api_token.qa" in result.output
     assert "Kept your saved secret." in result.output
+    assert "View entries" in result.output
+    assert "Search names" in result.output
     assert "api_token.qa\tsecret" in result.output
     assert "db.dev\tcredential" in result.output
     assert "username: fake-user" in result.output
@@ -271,6 +311,18 @@ def test_menu_manages_entries(cli, tmp_path, monkeypatch, password_terminal):
     vault = Vault(tmp_path)
     assert [entry.id for entry in vault.list()] == ["api_token.qa"]
     assert vault.get_secret("api_token.qa") == "FAKE-TOKEN"
+
+
+def test_view_search_hides_unmatched_names(cli, tmp_path, monkeypatch):
+    monkeypatch.setattr("clave.cli.terminal_session", lambda: True)
+    vault = Vault(tmp_path)
+    vault.store_secret("github_token", "HIDDEN-FAKE-TOKEN")
+    vault.store("database.dev", "fake-user", "HIDDEN-FAKE-PASSWORD")
+    result = cli([], input="3\nGITHUB\n0\n")
+    assert result.exit_code == 0, result.output
+    assert "github_token\tsecret" in result.stdout
+    assert "database.dev" not in result.output
+    assert "HIDDEN-FAKE" not in result.output
 
 
 def test_menu_backup_and_restore(tmp_path, monkeypatch):

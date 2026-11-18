@@ -6,17 +6,24 @@ Clave is a local encrypted vault for passwords and API tokens used in Python
 development and test automation. It supports Python 3.10 and newer on Windows,
 macOS, and Linux.
 
-**Release status.** Clave is a developer beta. See the
-[installation guide](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#1-install-clave)
-for PyPI, TestPyPI, and source installs.
+**Release status.** Clave is a developer beta.
 
 ## Quick start
 
-Once 0.2.0 is available on PyPI, install it in a virtual environment and save a
-credential:
+For a packaged release, start with the
+[TestPyPI and PyPI installation instructions](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#1-install-clave).
+
+To try Clave from source, run these commands in an active virtual environment.
 
 ```console
-python -m pip install clave==0.2.0
+git clone https://github.com/savankrm/Clave.git
+cd Clave
+python -m pip install .
+```
+
+Save a test credential from the terminal.
+
+```console
 clave store db_user.dev ExampleUser
 ```
 
@@ -31,7 +38,11 @@ credential = Vault().get("db_user.dev")
 username, password = credential.username, credential.password
 ```
 
-Pass the values directly to your application and keep them out of logs.
+Pass the values directly to your application and keep them out of logs. To see
+how a test can use a saved credential, run the
+[pytest login example](https://github.com/savankrm/Clave/tree/main/examples).
+The [quick start](https://github.com/savankrm/Clave/blob/main/QUICKSTART.md)
+walks through saving and restoring a test credential.
 
 ## Manage entries
 
@@ -44,8 +55,15 @@ clave get db_user.dev
 clave secret get api_token
 clave list
 clave list --env dev
+clave find github
 clave delete db_user.dev
 ```
+
+In the menu, choose **View entries** to search. For a manual login,
+`clave copy db_user.dev` copies the saved password to the system clipboard.
+Clipboard history and sync may retain it. See the
+[clipboard instructions](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#6-inspect-entries-safely)
+for platform requirements.
 
 Password and secret prompts hide input. Supplying a value positionally is allowed,
 but Clave warns that shell history and process listings may expose it:
@@ -201,7 +219,8 @@ python -m build
 ```
 
 Pull request CI runs the suite on Python 3.10 through 3.15 on Windows, macOS, and
-Linux. A push checks that Clave installs and that `clave --help` runs. See
+Linux. A push checks installation and `clave --help` on all three platforms
+using the latest stable Python 3. See
 [USER_GUIDE.md](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md) for the
 complete manual,
 [PUBLISHING.md](https://github.com/savankrm/Clave/blob/main/PUBLISHING.md) for owner
@@ -209,4 +228,4 @@ release steps, and
 [CHANGELOG.md](https://github.com/savankrm/Clave/blob/main/CHANGELOG.md)
 for release notes and verification results.
 
-MIT license is included for owner review. Nothing has been published by this build.
+Released under the [MIT license](https://github.com/savankrm/Clave/blob/main/LICENSE).
