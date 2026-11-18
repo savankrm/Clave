@@ -2,7 +2,7 @@
 
 Both package indexes use the manual **release rehearsal** workflow on protected
 `main` in `savankrm/Clave`. The release version comes from `pyproject.toml`.
-The current release candidate is `0.2.0`, which requires Python 3.10 or newer.
+The current release candidate is `0.2.1`, which requires Python 3.10 or newer.
 
 TestPyPI is the practice index. Both TestPyPI and production PyPI make uploaded
 packages public. Trusted Publishing exchanges the GitHub workflow identity for a
@@ -52,15 +52,24 @@ test matrix to pass before merging. Review the built archives for the expected
 source, typing marker, license, and metadata. Review the dependency audit and
 test recovery from an existing vault.
 
+The CI workflow reports a single **PR checks** status for the full matrix.
+After it has reported on GitHub, add **PR checks** to the required status checks
+in the branch ruleset. Feature pushes run the smoke matrix.
+
+The rehearsal build uses `pip-audit` on the runtime dependencies installed
+with the wheel. If it reports a vulnerability, review the advisory, update
+the affected dependency, and rerun the audit before approving publication.
+
 ## 4. Run and verify TestPyPI
 
 1. Under **Actions → release rehearsal → Run workflow**, select `main` and
    destination `testpypi`. Leave the rehearsal run ID blank.
 2. Review the build's commit, wheel, source archive, and SHA256 hashes. Approve
    the `testpypi` deployment under **Review deployments**.
-3. Wait for `verify-testpypi` to pass. It installs the exact wheel from TestPyPI
-   with dependencies from PyPI, smoke-tests it, and checks the published wheel
-   and source archive hashes.
+3. Wait for `verify-testpypi` to pass. The verification jobs install the exact
+   wheel from TestPyPI on Python 3.10 and 3.14, smoke-test it, and check the
+   published wheel and source archive hashes. Python 3.14 also copies and
+   reads back a fake password using an isolated X11 clipboard.
 4. Follow the [installation guide](USER_GUIDE.md#1-install-clave) in a fresh
    environment and [test a restore](USER_GUIDE.md#11-check-and-recover-your-vault).
    Save the workflow run ID, commit SHA, and both package hashes.

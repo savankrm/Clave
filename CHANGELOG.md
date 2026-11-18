@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1
+
+- Search entry names with `clave find` or **View entries** in the menu.
+- Copy credential passwords with `clave copy` and see a clipboard-history warning.
+- Move artifact uploads, downloads, and PyPI rehearsal validation to GitHub
+  Actions versions that use Node.js 24.
+- Run push smoke checks on Windows, macOS, and Linux using the latest stable
+  Python 3.
+- Put usable install steps first and link the quick start to the pytest example.
+- Test safe backup failures for a full disk and filesystems without hard links.
+- Audit release dependencies and verify the TestPyPI wheel on Python 3.10 and
+  3.14, including a clipboard check on an isolated X11 display.
+- Report a single PR status for the cross-platform test matrix.
+
 ## 0.2.0
 
 ### Vault and CLI

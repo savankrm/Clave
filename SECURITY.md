@@ -32,6 +32,9 @@ snapshots, storage remnants, memory and external logs are outside Clave's contro
 CLI reads never intentionally emit passwords or secret values. Positional values
 can already be exposed by shell history/process listings before Clave starts.
 Python callers must not log plaintext returns or credential fields.
+The explicit `clave copy` command sends a credential password to the system
+clipboard. Other applications, clipboard history, and clipboard sync may retain
+it beyond the current session.
 
 The first store commits the schema, key check, and entry in one SQLite transaction.
 Restore commits the schema, key check, and all recovered entries together. On
@@ -45,8 +48,9 @@ without a usable backup.** Backups from this checkout contain an authenticated,
 encrypted snapshot of entry data and metadata. A separate passphrase derives the
 archive encryption key using scrypt with a random salt. The archive envelope
 exposes its format, size, salt, and Fernet creation time. An attacker with a copy
-can attempt to guess the passphrase offline. Choose a strong, unique passphrase
-and store it separately from the archive. Clave cannot recover a forgotten
+can attempt to guess the passphrase offline. Clave accepts at least 12 characters.
+Use a password manager to generate a long, unique passphrase and store it
+separately from the archive. Clave cannot recover a forgotten
 passphrase. The original vault key is absent from the archive. Restore creates a
 new key in a fresh vault. See the [recovery guide](USER_GUIDE.md#11-check-and-recover-your-vault).
 
