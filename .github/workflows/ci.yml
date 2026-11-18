@@ -34,19 +34,23 @@ jobs:
           python-version: ${{ matrix.python }}
 
   test-macos:
-    name: macOS (Python ${{ matrix.first }}, ${{ matrix.second }}, ${{ matrix.third }})
+    name: macOS ${{ matrix.arch }} (Python ${{ matrix.first }}, ${{ matrix.second }}, ${{ matrix.third }})
     if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
         include:
-          - first: '3.10'
+          - arch: Intel
+            runner: macos-15-intel
+            first: '3.10'
             second: '3.11'
             third: '3.12'
-          - first: '3.13'
+          - arch: ARM
+            runner: macos-latest
+            first: '3.13'
             second: '3.14'
             third: '3.15'
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7.0.1
         id: checkout

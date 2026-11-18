@@ -56,9 +56,9 @@ The CI workflow reports a single **PR checks** status for the full matrix.
 After it has reported on GitHub, add **PR checks** to the required status checks
 in the branch ruleset. Feature pushes run the smoke matrix.
 
-Pull requests request two macOS runners. Each runs the full checks for three
-Python versions in sequence. If GitHub cancels a job before it acquires a
-runner, rerun that job from the Actions run. GitHub reruns the dependent
+Pull requests use two macOS runners, one Intel and one ARM. Each runs the full
+checks for three Python versions in sequence. If GitHub cancels a job before it
+acquires a runner, rerun that job from the Actions run. GitHub reruns the dependent
 **PR checks** status with it.
 
 The rehearsal build uses `pip-audit` on the runtime dependencies installed
