@@ -158,7 +158,7 @@ class Vault:
 
     def doctor(self) -> None:
         """Check vault integrity and permissions without changing stored data."""
-        with self._storage.connection() as (db, fernet):
+        with self._storage.connection(rotate_due=False) as (db, fernet):
             if [row[0] for row in db.execute("PRAGMA integrity_check")] != ["ok"]:
                 raise VaultCorrupt("Vault database failed its integrity check.")
             for _ in self._snapshot_entries(db, fernet):
@@ -169,6 +169,10 @@ class Vault:
         with self._storage.connection() as (db, fernet):
             entries = list(self._snapshot_entries(db, fernet))
         write_archive(Path(path), passphrase, entries)
+
+    def rotate_key(self) -> None:
+        """Replace the encryption key for this vault without changing its entries."""
+        self._storage.rotate_key()
 
     def restore(self, path: str | Path, passphrase: str) -> None:
         """Restore an archive into a fresh vault using a newly generated local key."""
@@ -182,7 +186,7 @@ class Vault:
                 seen.add(address)
         except VaultCorrupt:
             raise BackupError("The backup contains invalid entries.") from None
-        with self._storage.store_connection() as (db, fernet, created):
+        with self._storage.store_connection(rotate_due=False) as (db, fernet, created):
             if not created:
                 raise BackupError(
                     "A vault already exists here. Choose a fresh location."

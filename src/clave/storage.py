@@ -6,8 +6,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from time import time
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from .config import Paths, private_dir
 from .crypto import LocalFileKeyProvider, decrypt, encrypt
@@ -20,6 +21,8 @@ from .exceptions import (
 
 RECOVERY = "Keep an encrypted backup and its passphrase somewhere safe."
 _INITIALIZE_LOCK = threading.Lock()
+_KEY_CHECK = {"v": 1, "kind": "key-check"}
+_ROTATION_INTERVAL = 15 * 24 * 60 * 60
 
 
 def now() -> str:
@@ -30,6 +33,8 @@ class Storage:
     def __init__(self, paths: Paths) -> None:
         self.paths = paths
         self.keys = LocalFileKeyProvider(paths.key)
+        self._next_key = LocalFileKeyProvider(paths.key.with_suffix(".key.next"))
+        self._key_draft = LocalFileKeyProvider(paths.key.with_suffix(".key.draft"))
 
     def state(self) -> bool:
         self.paths.check()
@@ -65,14 +70,16 @@ class Storage:
                 )
 
     @contextmanager
-    def store_connection(self) -> Iterator[tuple[sqlite3.Connection, Fernet, bool]]:
+    def store_connection(
+        self, *, rotate_due: bool = True
+    ) -> Iterator[tuple[sqlite3.Connection, Fernet, bool]]:
         """Open a write transaction, creating the schema with the first entry."""
         with _INITIALIZE_LOCK:
             if not self.state():
                 with self._initialize() as (db, fernet):
                     yield db, fernet, True
                 return
-        with self.connection(write=True) as (db, fernet):
+        with self.connection(write=True, rotate_due=rotate_due) as (db, fernet):
             yield db, fernet, False
 
     @contextmanager
@@ -106,7 +113,7 @@ class Storage:
                 """)
                 db.execute(
                     "INSERT INTO vault_meta VALUES (1, 'local-file', ?, ?)",
-                    (encrypt(fernet, {"v": 1, "kind": "key-check"}), now()),
+                    (encrypt(fernet, _KEY_CHECK), now()),
                 )
                 yield db, fernet
                 commit_started = True
@@ -126,8 +133,107 @@ class Storage:
 
     @contextmanager
     def connection(
-        self, *, write: bool = False, check: bool = True
+        self, *, write: bool = False, check: bool = True, rotate_due: bool = True
     ) -> Iterator[tuple[sqlite3.Connection, Fernet]]:
+        if check and self._has_staged_key():
+            self._rotate_key(force=False, rotate_due=rotate_due)
+        with self._connection(write=write, check=check) as (
+            db,
+            fernet,
+            marker,
+            pending,
+        ):
+            if not pending and not (rotate_due and self._rotation_due(fernet, marker)):
+                yield db, fernet
+                return
+        self._rotate_key(force=False, rotate_due=rotate_due)
+        with self._connection(write=write) as (db, fernet, _, _):
+            yield db, fernet
+
+    def rotate_key(self) -> None:
+        self._rotate_key(force=True, rotate_due=True)
+
+    def _has_staged_key(self) -> bool:
+        return self._next_key.exists() or self._key_draft.exists()
+
+    @staticmethod
+    def _rotation_due(fernet: Fernet, marker: bytes | None) -> bool:
+        return marker is not None and time() >= (
+            fernet.extract_timestamp(marker) + _ROTATION_INTERVAL
+        )
+
+    def _rotate_key(self, *, force: bool, rotate_due: bool) -> None:
+        try:
+            with self._connection(write=True, exclusive=True) as (
+                db,
+                current,
+                marker,
+                pending,
+            ):
+                if self._key_draft.exists():
+                    self._key_draft.path.unlink()
+                if pending:
+                    # SQLite committed in the previous run. Finish publishing its key.
+                    self.keys.replace_with(self._next_key)
+                    return
+                if self._next_key.exists():
+                    # SQLite rolled back. The original key still matches the vault.
+                    self._next_key.path.unlink()
+                if not force and not (
+                    rotate_due and self._rotation_due(current, marker)
+                ):
+                    return
+
+                self._key_draft.create()
+                self._next_key.replace_with(self._key_draft)
+                replacement = self._next_key.load()
+                rotator = MultiFernet([replacement, current])
+                rows = db.execute(
+                    "SELECT rowid, encrypted_payload FROM entries"
+                ).fetchall()
+                db.executemany(
+                    "UPDATE entries SET encrypted_payload=? WHERE rowid=?",
+                    ((rotator.rotate(row[1]), row[0]) for row in rows),
+                )
+                db.execute(
+                    "UPDATE vault_meta SET encrypted_key_check=?",
+                    (encrypt(replacement, _KEY_CHECK),),
+                )
+            # The committed marker can select the staged key while we reacquire the lock.
+            with self._connection(write=True, exclusive=True) as (_, _, _, pending):
+                if pending:
+                    self.keys.replace_with(self._next_key)
+        except InvalidToken:
+            raise VaultCorrupt(
+                "Key rotation stopped because an entry could not be unlocked."
+            ) from None
+        except OSError:
+            raise IncompleteVault(
+                "Could not finish vault key rotation. Keep the vault files and try again."
+            ) from None
+
+    def _key_for_marker(self, marker: bytes) -> tuple[Fernet, bool]:
+        fernet = self.keys.load()
+        try:
+            if decrypt(fernet, marker) == _KEY_CHECK:
+                return fernet, False
+        except VaultCorrupt:
+            pass
+        if self._next_key.exists():
+            fernet = self._next_key.load()
+            try:
+                if decrypt(fernet, marker) == _KEY_CHECK:
+                    return fernet, True
+            except VaultCorrupt:
+                pass
+        raise VaultCorrupt(
+            "Clave cannot unlock this vault. Check that the key and database belong together."
+        )
+
+    @contextmanager
+    def _connection(
+        self, *, write: bool, check: bool = True, exclusive: bool = False
+    ) -> Iterator[tuple[sqlite3.Connection, Fernet, bytes | None, bool]]:
         if not self.state():
             raise VaultNotInitialized(
                 "No vault found. Save your first credential or secret to create one."
@@ -145,9 +251,17 @@ class Storage:
             db.row_factory = sqlite3.Row
             if write:
                 db.execute("PRAGMA secure_delete=ON")
+            if exclusive:
+                db.execute("PRAGMA synchronous=EXTRA")
             with db:
-                db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
-                fernet = self.keys.load()
+                if exclusive:
+                    db.execute("BEGIN EXCLUSIVE")
+                    if db.execute("PRAGMA journal_mode").fetchone()[0] != "delete":
+                        raise IncompleteVault(
+                            "Vault key rotation requires SQLite's default journal mode."
+                        )
+                else:
+                    db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
                 if check:
                     rows = db.execute(
                         "SELECT schema_version, key_provider, encrypted_key_check FROM vault_meta"
@@ -162,19 +276,11 @@ class Storage:
                         raise UnsupportedSchema(
                             "Unsupported vault schema or key provider."
                         )
-                    try:
-                        key_check = decrypt(fernet, row["encrypted_key_check"])
-                    except VaultCorrupt:
-                        key_check = {}
-                    if key_check != {
-                        "v": 1,
-                        "kind": "key-check",
-                    }:
-                        raise VaultCorrupt(
-                            "Clave cannot unlock this vault. Check that the key and "
-                            "database belong together."
-                        )
-                yield db, fernet
+                    marker = row["encrypted_key_check"]
+                    fernet, pending = self._key_for_marker(marker)
+                    yield db, fernet, marker, pending
+                else:
+                    yield db, self.keys.load(), None, False
         except sqlite3.Error:
             raise VaultCorrupt(
                 "Vault database operation failed; data was not reset."

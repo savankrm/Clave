@@ -1,10 +1,15 @@
 import errno
+import json
 import os
 import sqlite3
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from time import time
 
 import pytest
+from cryptography.fernet import Fernet, InvalidToken
 
 from clave import (
     BackupError,
@@ -16,6 +21,94 @@ from clave import (
 )
 
 PASSPHRASE = "fake archive passphrase"
+
+
+def test_rotation_is_due_after_fifteen_days(tmp_path, monkeypatch):
+    vault = Vault(tmp_path / "vault")
+    vault.store("db.dev", "fake-user", "fake-password")
+    vault.store_secret("token", "fake-token")
+    paths = vault._storage.paths
+    original_key = paths.key.read_bytes()
+    original_entries = vault.list()
+    cutoff = int(time())
+    marker = Fernet(original_key).encrypt_at_time(
+        json.dumps({"v": 1, "kind": "key-check"}).encode(), cutoff - 15 * 86400
+    )
+    with closing(sqlite3.connect(paths.database)) as db, db:
+        db.execute("UPDATE vault_meta SET encrypted_key_check=?", (marker,))
+    monkeypatch.setattr("clave.storage.time", lambda: cutoff - 1)
+    assert vault.get_secret("token") == "fake-token"
+    assert paths.key.read_bytes() == original_key
+
+    monkeypatch.setattr("clave.storage.time", lambda: cutoff)
+    vault.doctor()
+    assert paths.key.read_bytes() == original_key
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(vault.get_secret, ["token"] * 4))
+    assert results == ["fake-token"] * 4
+    replacement = paths.key.read_bytes()
+    assert replacement != original_key
+    assert vault.get("db.dev").password == "fake-password"
+    assert vault.list() == original_entries
+    assert paths.key.read_bytes() == replacement
+    with closing(sqlite3.connect(paths.database)) as db:
+        payload = db.execute(
+            "SELECT encrypted_payload FROM entries LIMIT 1"
+        ).fetchone()[0]
+    with pytest.raises(InvalidToken):
+        Fernet(original_key).decrypt(payload)
+    assert not list(paths.key.parent.glob("vault.key.*"))
+
+
+@pytest.mark.parametrize("phase", ["before-commit", "after-commit"])
+def test_rotation_recovers_after_process_termination(tmp_path, phase):
+    root = tmp_path / "vault"
+    vault = Vault(root)
+    vault.store_secret("token", "fake-token")
+    key = vault._storage.paths.key
+    original = key.read_bytes()
+    crash = """
+import os
+import sys
+
+from clave import Vault
+from clave.crypto import LocalFileKeyProvider
+
+def terminate_before_commit(*args):
+    os._exit(71)
+
+replace = LocalFileKeyProvider.replace_with
+
+def terminate_after_commit(self, staged):
+    if self.path.name == 'vault.key':
+        os._exit(71)
+    replace(self, staged)
+
+if sys.argv[2] == 'before-commit':
+    import clave.storage
+    clave.storage.encrypt = terminate_before_commit
+else:
+    LocalFileKeyProvider.replace_with = terminate_after_commit
+
+Vault(sys.argv[1]).rotate_key()
+"""
+    process = subprocess.run(
+        [sys.executable, "-c", crash, str(root), phase],
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    assert process.returncode == 71, process.stderr.decode()
+    staged = key.with_suffix(".key.next").read_bytes()
+    assert key.read_bytes() == original
+
+    assert Vault(root).get_secret("token") == "fake-token"
+    expected = original if phase == "before-commit" else staged
+    assert key.read_bytes() == expected
+    assert not list(key.parent.glob("vault.key.*"))
+    vault.rotate_key()
+    assert key.read_bytes() != expected
+    vault.doctor()
 
 
 def test_recovery_without_original_key_or_database(tmp_path):

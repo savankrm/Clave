@@ -202,6 +202,10 @@ clave --data-dir recovered-vault restore clave-backup.clave
 clave --data-dir recovered-vault doctor
 ```
 
+Use `clave export` and `clave import` for the same encrypted archive workflow
+when moving a vault. Run `clave rotate-key` to replace the encryption key in
+place. Clave also rotates a due key when you use the vault after 15 days.
+
 Keep the backup and passphrase in separate safe locations. Losing either vault
 file may permanently lose records without a usable backup. See the
 [recovery instructions](https://github.com/savankrm/Clave/blob/main/USER_GUIDE.md#11-check-and-recover-your-vault)

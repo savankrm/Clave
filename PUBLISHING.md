@@ -2,7 +2,7 @@
 
 Both package indexes use the manual **release rehearsal** workflow on protected
 `main` in `savankrm/Clave`. The release version comes from `pyproject.toml`.
-The current release candidate is `0.2.1`, which requires Python 3.10 or newer.
+The current release candidate is `0.2.2`, which requires Python 3.10 or newer.
 
 TestPyPI is the practice index. Both TestPyPI and production PyPI make uploaded
 packages public. Trusted Publishing exchanges the GitHub workflow identity for a
@@ -55,6 +55,11 @@ test recovery from an existing vault.
 The CI workflow reports a single **PR checks** status for the full matrix.
 After it has reported on GitHub, add **PR checks** to the required status checks
 in the branch ruleset. Feature pushes run the smoke matrix.
+
+Pull requests request two macOS runners. Each runs the full checks for three
+Python versions in sequence. If GitHub cancels a job before it acquires a
+runner, rerun that job from the Actions run. GitHub reruns the dependent
+**PR checks** status with it.
 
 The rehearsal build uses `pip-audit` on the runtime dependencies installed
 with the wheel. If it reports a vulnerability, review the advisory, update

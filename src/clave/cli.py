@@ -248,6 +248,7 @@ def doctor(ctx: typer.Context) -> None:
         typer.echo("Review vault folder access in Windows Security properties.")
 
 
+@app.command(name="export", help="Export an encrypted archive to a new file.")
 @app.command()
 @friendly
 def backup(ctx: typer.Context, path: Path) -> None:
@@ -256,12 +257,21 @@ def backup(ctx: typer.Context, path: Path) -> None:
     typer.echo("Encrypted backup saved.")
 
 
+@app.command(name="import", help="Import an encrypted archive into an empty vault.")
 @app.command()
 @friendly
 def restore(ctx: typer.Context, path: Path) -> None:
     """Restore an encrypted backup into a fresh vault."""
     vault(ctx).restore(path, backup_passphrase())
     typer.echo("Encrypted backup restored.")
+
+
+@app.command()
+@friendly
+def rotate_key(ctx: typer.Context) -> None:
+    """Replace the selected vault's encryption key now."""
+    vault(ctx).rotate_key()
+    typer.echo("Vault encryption key rotated.")
 
 
 @app.command()

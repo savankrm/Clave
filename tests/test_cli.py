@@ -352,7 +352,10 @@ def test_menu_backup_and_restore(tmp_path, monkeypatch):
     assert Vault(target).get_secret("token") == "fake secret"
 
 
-def test_recovery_commands(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "export,import_", [("backup", "restore"), ("export", "import")]
+)
+def test_recovery_commands(tmp_path, monkeypatch, export, import_):
     runner = CliRunner()
     source, target = tmp_path / "source", tmp_path / "target"
     archive = tmp_path / "backup.clave"
@@ -360,16 +363,14 @@ def test_recovery_commands(tmp_path, monkeypatch):
     value = "FAKE-SECRET-NOT-FOR-OUTPUT"
     Vault(source).store_secret("token", value)
     assert (
-        runner.invoke(
-            app, ["--data-dir", str(source), "backup", str(archive)]
-        ).exit_code
+        runner.invoke(app, ["--data-dir", str(source), export, str(archive)]).exit_code
         == 1
     )
     assert not archive.exists()
     monkeypatch.setattr("clave.cli.interactive", lambda: True)
     result = runner.invoke(
         app,
-        ["--data-dir", str(source), "backup", str(archive)],
+        ["--data-dir", str(source), export, str(archive)],
         input=f"{passphrase}\n{passphrase}\n",
     )
     assert result.exit_code == 0, result.output
@@ -378,7 +379,7 @@ def test_recovery_commands(tmp_path, monkeypatch):
     assert value not in result.output
     result = runner.invoke(
         app,
-        ["--data-dir", str(target), "restore", str(archive)],
+        ["--data-dir", str(target), import_, str(archive)],
         input=f"{passphrase}\n",
     )
     assert result.exit_code == 0, result.output
@@ -387,3 +388,23 @@ def test_recovery_commands(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert value not in result.output
     assert Vault(target).get_secret("token") == value
+
+    result = runner.invoke(
+        app, ["--data-dir", str(target), import_, str(archive)], input=f"{passphrase}\n"
+    )
+    assert result.exit_code == 1
+    assert "A vault already exists here" in result.output
+    assert Vault(target).get_secret("token") == value
+
+
+def test_rotate_key_command(cli, tmp_path):
+    vault = Vault(tmp_path)
+    vault.store_secret("token", "ROTATION-FAKE-SECRET")
+    key_path = vault._storage.paths.key
+    original = key_path.read_bytes()
+    result = cli(["rotate-key"])
+    assert result.exit_code == 0, result.output
+    assert "Vault encryption key rotated." in result.stdout
+    assert "ROTATION-FAKE-SECRET" not in result.output
+    assert key_path.read_bytes() != original
+    assert vault.get_secret("token") == "ROTATION-FAKE-SECRET"
