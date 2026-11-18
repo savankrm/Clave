@@ -203,6 +203,12 @@ class Vault:
                 ),
             )
 
+    def find(self, query: str, *, env: str | None = None) -> list[EntryMetadata]:
+        """Find entry names by case-insensitive substring."""
+        nonblank(query)
+        term = query.strip().casefold()
+        return [entry for entry in self.list(env) if term in entry.id.casefold()]
+
     def list(self, env: str | None = None) -> list[EntryMetadata]:
         if env is not None:
             environment(env)

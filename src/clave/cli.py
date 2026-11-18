@@ -1,4 +1,4 @@
-"""Metadata-only command line interface."""
+"""Command line interface for local vaults."""
 
 import sys
 from collections.abc import Callable
@@ -16,6 +16,7 @@ from prompt_toolkit.utils import is_dumb_terminal
 from typer import _click as click
 from typer.core import TyperGroup
 
+from .clipboard import copy_password
 from .exceptions import ClaveError, EntryAlreadyExists
 from .identifiers import identifier, nonblank, secret_identifier
 from .models import EntryType, StoreResult
@@ -206,6 +207,39 @@ def list_entries(ctx: typer.Context, env: str | None = typer.Option(None)) -> No
 
 @app.command()
 @friendly
+def find(ctx: typer.Context, query: str, env: str | None = typer.Option(None)) -> None:
+    """Search credential and secret names."""
+    matches = vault(ctx).find(query, env=env)
+    if not matches:
+        typer.echo("No matching entries.")
+    for entry in matches:
+        typer.echo(f"{entry.id}\t{entry.entry_type}")
+
+
+@app.command()
+@friendly
+def copy(ctx: typer.Context, id: str) -> None:
+    """Copy a credential password to the local clipboard."""
+    copy_password(vault(ctx).get(id).password)
+    typer.echo("Password copied to the clipboard.")
+    typer.echo("Clipboard history or sync may retain the password.", err=True)
+
+
+def view_entries(ctx: typer.Context) -> None:
+    query: str = typer.prompt(
+        "Search names (Enter to browse)", default="", show_default=False
+    )
+    if query.strip():
+        find(ctx, query, env=None)
+    else:
+        env: str = typer.prompt(
+            "Environment (Enter for all)", default="", show_default=False
+        )
+        list_entries(ctx, env=env or None)
+
+
+@app.command()
+@friendly
 def doctor(ctx: typer.Context) -> None:
     """Check the selected vault for problems without displaying its contents."""
     vault(ctx).doctor()
@@ -305,16 +339,7 @@ def run_menu(ctx: typer.Context) -> None:
                 ctx, typer.prompt(secret_name), value=None, replace=False
             ),
         ),
-        "3": (
-            "List entries",
-            lambda: list_entries(
-                ctx,
-                env=typer.prompt(
-                    "Environment (Enter for all)", default="", show_default=False
-                )
-                or None,
-            ),
-        ),
+        "3": ("View entries", lambda: view_entries(ctx)),
         "4": ("Inspect a credential", lambda: get(ctx, typer.prompt(credential_name))),
         "5": ("Inspect a secret", lambda: secret_get(ctx, typer.prompt(secret_name))),
         "6": (
