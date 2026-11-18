@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import sys
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
@@ -65,7 +66,7 @@ class LocalFileKeyProvider:
     def replace_with(self, staged: LocalFileKeyProvider) -> None:
         safe_path(self.path)
         safe_path(staged.path)
-        if os.name == "nt":
+        if sys.platform == "win32":
             import ctypes
             from ctypes import wintypes
 
