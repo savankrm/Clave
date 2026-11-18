@@ -10,18 +10,15 @@ Clave supports Python 3.10 and newer on Windows, macOS, and Linux.
 
 ### TestPyPI beta
 
-In a fresh virtual environment, download the published 0.2.0 wheel from
-TestPyPI. Install that wheel so pip gets its dependencies from the usual
-package index.
+In a fresh virtual environment, download the published
+[0.2.1 wheel from TestPyPI](https://test.pypi.org/project/clave/0.2.1/).
+Install that wheel so pip gets its dependencies from the usual package index.
 
 ```console
-python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.0
-python -m pip install ./clave-0.2.0-py3-none-any.whl
+python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.1
+python -m pip install ./clave-0.2.1-py3-none-any.whl
 clave --help
 ```
-
-For the 0.2.1 rehearsal, use `0.2.1` in both commands after the
-[TestPyPI upload](https://test.pypi.org/project/clave/) completes.
 
 ### Source checkout
 

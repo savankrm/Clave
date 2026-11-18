@@ -7,17 +7,15 @@ on Python 3.10 or newer on Windows, macOS, and Linux.
 
 ## Install the beta
 
-The developer beta is available on [TestPyPI](https://test.pypi.org/project/clave/0.2.0/).
+The developer beta is available on [TestPyPI](https://test.pypi.org/project/clave/0.2.1/).
 In an active virtual environment, download the Clave wheel from TestPyPI and
 install it with dependencies from your regular package index.
 
 ```console
-python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.0
-python -m pip install ./clave-0.2.0-py3-none-any.whl
+python -m pip download --index-url https://test.pypi.org/simple/ --no-deps --only-binary=:all: clave==0.2.1
+python -m pip install ./clave-0.2.1-py3-none-any.whl
 clave --help
 ```
-
-Use `0.2.1` in both commands after the [TestPyPI upload](https://test.pypi.org/project/clave/) completes.
 
 ## Save a credential and use it in Python
 
