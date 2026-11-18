@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- Export and import encrypted vault archives with `clave export` and `clave import`.
+- Rotate the active vault key in place with `clave rotate-key` or on the next
+  credential operation after 15 days. Recover interrupted rotations on the next use.
+- Enforce private POSIX permissions before initializing or accessing a vault.
+
 ## 0.2.1
 
 - Search entry names with `clave find` or **View entries** in the menu.

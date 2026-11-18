@@ -18,6 +18,7 @@ def main() -> None:
         else [sys.executable, "-m", "clave"]
     )
     legacy = "--legacy-0.1.0" in sys.argv[3:]
+    installed_version = version("clave")
     check_clipboard = "--clipboard" in sys.argv[3:]
     assert Path(clave.__file__).is_relative_to(installed_root)
     with TemporaryDirectory() as directory:
@@ -60,7 +61,7 @@ def main() -> None:
         cli("secret", "store", "regional_token.qa", "fake-smoke-token")
         assert vault.get_secret("regional_token.qa") == "fake-smoke-token"
         assert "environment: qa" in cli("secret", "get", "regional_token.qa").stdout
-        if not legacy and version("clave") != "0.2.0":
+        if not legacy and installed_version != "0.2.0":
             assert cli("find", "TOKEN", "--env", "qa").stdout.strip() == (
                 "regional_token.qa\tsecret"
             )
@@ -82,6 +83,12 @@ def main() -> None:
             recovered.restore(archive, passphrase)
             assert recovered.get("smoke.dev").password == "fake-smoke-password"
             assert recovered.get_secret("regional_token.qa") == "fake-smoke-token"
+        if not legacy and installed_version not in ("0.2.0", "0.2.1"):
+            assert "encrypted archive" in cli("export", "--help").stdout
+            assert "encrypted archive" in cli("import", "--help").stdout
+            assert "Vault encryption key rotated." in cli("rotate-key").stdout
+            assert vault.get("smoke.dev").password == "fake-smoke-password"
+            assert vault.get_secret("regional_token.qa") == "fake-smoke-token"
         cli("get", "regional_token.qa", success=False)
         cli("secret", "store", "smoke.dev", "fake-smoke-token", success=False)
         cli("store", "bad.id.extra", "fake-user", "fake-smoke-password", success=False)

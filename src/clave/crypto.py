@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import json
 import os
+import stat
+import sys
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
@@ -7,7 +11,7 @@ from typing import Any, cast
 from cryptography.fernet import Fernet, InvalidToken
 
 from .config import safe_path
-from .exceptions import VaultCorrupt
+from .exceptions import IncompleteVault, VaultCorrupt
 
 
 class LocalFileKeyProvider:
@@ -38,6 +42,45 @@ class LocalFileKeyProvider:
             raise VaultCorrupt(
                 "Cannot read a valid vault key; no key was regenerated."
             ) from None
+
+    def exists(self) -> bool:
+        safe_path(self.path)
+        try:
+            mode = self.path.stat().st_mode
+        except FileNotFoundError:
+            return False
+        if not stat.S_ISREG(mode) or (os.name != "nt" and mode & 0o077):
+            raise IncompleteVault(
+                "The staged vault key must be a private regular file."
+            )
+        return True
+
+    def sync_parent(self) -> None:
+        if os.name != "nt":
+            fd = os.open(self.path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+    def replace_with(self, staged: LocalFileKeyProvider) -> None:
+        safe_path(self.path)
+        safe_path(staged.path)
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+
+            move = ctypes.WinDLL("kernel32", use_last_error=True).MoveFileExW
+            move.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+            move.restype = wintypes.BOOL
+            replace_existing, write_through = 0x1, 0x8
+            if not move(
+                str(staged.path), str(self.path), replace_existing | write_through
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+        else:
+            staged.path.replace(self.path)
+        self.sync_parent()
 
 
 def encrypt(fernet: Fernet, payload: dict[str, Any]) -> bytes:

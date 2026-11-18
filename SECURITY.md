@@ -46,6 +46,12 @@ only the files it created during that attempt. A crash or failed cleanup can
 still leave files that require owner inspection. Do not delete files containing
 valuable records in an attempt to reset the vault.
 
+Key rotation uses a private staged key and updates the entry ciphertext and key
+check in a single SQLite transaction. After the commit, Clave replaces the active
+key. On restart, the committed key check identifies which key can unlock the vault.
+Rotation does not revoke provider credentials or protect copies already taken with
+the previous key. If credentials were exposed, replace them with their providers.
+
 **Losing the key or database, or corrupting either, can irreversibly lose records
 without a usable backup.** Backups from this checkout contain an authenticated,
 encrypted snapshot of entry data and metadata. A separate passphrase derives the

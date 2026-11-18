@@ -36,6 +36,8 @@ build/
 *.vault
 *.enc
 *.key
+vault.key.next
+vault.key.draft
 *.salt
 vault.json
 

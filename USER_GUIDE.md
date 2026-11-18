@@ -327,6 +327,31 @@ place and restore to a separate directory. Verify the restored entries before
 switching, then pass `--data-dir recovered-vault` to the CLI or use
 `Vault(data_dir="recovered-vault")` in Python.
 
+### Move a vault to another computer
+
+`export` and `import` use the same archive format as `backup` and `restore`.
+Export to a new file, copy that file to the destination, then import into a
+fresh vault using the same passphrase.
+
+```console
+clave export move.clave
+clave --data-dir imported-vault import move.clave
+clave --data-dir imported-vault doctor
+```
+
+### Rotate the encryption key
+
+Run `clave rotate-key` or call `vault.rotate_key()` to replace the key now.
+Clave also rotates on the first normal vault operation at least 15 days after
+the key was created or last rotated. A closed vault needs no background service.
+Rotation needs write access and SQLite's default rollback journal. `clave doctor`
+does not start a scheduled rotation but can finish recovery from one.
+
+Your vault stays in the same location. Its entries and timestamps are preserved,
+and earlier exports still open with their original passphrases. If an operation
+was interrupted, leave the vault files together, including any `vault.key.next`
+or `vault.key.draft` file. The next access recovers the rotation automatically.
+
 ## 12. Troubleshooting
 
 | Symptom | Resolution |
@@ -347,8 +372,8 @@ switching, then pass `--data-dir recovered-vault` to the CLI or use
 - Anyone with both files, or code running with your account's permissions, can decrypt records.
 - IDs, entry types, timestamps, database structure, and Fernet creation times remain visible.
 - Losing either file or corruption can permanently lose records without a usable backup and passphrase.
-- Clave's local vault uses a file-based key. Key rotation, OS keychain support,
-  cloud fallback, and secure CI secret delivery are outside the current scope.
+- Clave's local vault uses a file-based key. OS keychain support, cloud fallback,
+  and secure CI secret delivery are outside the current scope.
 
 See [SECURITY.md](SECURITY.md) for the full threat model, [README.md](README.md) for
 the project overview, and [PUBLISHING.md](PUBLISHING.md) for owner release steps.
