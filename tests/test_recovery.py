@@ -1,3 +1,4 @@
+import errno
 import os
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
@@ -70,6 +71,37 @@ def test_invalid_archives_leave_no_vault(tmp_path):
     with pytest.raises(BackupError, match="cannot unlock"):
         restored.restore(archive, PASSPHRASE)
     assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    ("operation", "error_code", "message"),
+    [
+        ("fsync", errno.ENOSPC, "Not enough space"),
+        ("link", errno.ENOTSUP, "supports hard links"),
+    ],
+)
+def test_failed_backup_leaves_no_archive_or_changes(
+    tmp_path, monkeypatch, operation, error_code, message
+):
+    vault = Vault(tmp_path / "vault")
+    vault.store_secret("token", "fake-original")
+    output = tmp_path / "backups"
+    output.mkdir()
+
+    def fail(*args):
+        raise OSError(error_code, "simulated backup failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(f"clave.backup.os.{operation}", fail)
+        with pytest.raises(BackupError, match=message):
+            vault.backup(output / "backup.clave", PASSPHRASE)
+
+    assert list(output.iterdir()) == []
+    assert vault.get_secret("token") == "fake-original"
+    vault.backup(output / "backup.clave", PASSPHRASE)
+    restored = Vault(tmp_path / "restored")
+    restored.restore(output / "backup.clave", PASSPHRASE)
+    assert restored.get_secret("token") == "fake-original"
 
 
 def test_restore_refuses_partial_vault_and_rolls_back_failed_write(
