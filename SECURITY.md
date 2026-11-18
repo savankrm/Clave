@@ -22,9 +22,12 @@ POSIX application directories are created with mode 0700; key/database files wit
 restricted user-profile ACLs: chmod is not a Windows security guarantee. Custom
 roots must also have appropriate ACLs. Clave rejects symlinks and junctions at
 the vault root, storage directories, and storage files. Ancestors above the vault
-root may be redirected by the operating system or user. Existing directory
-permissions are left intact. These checks do not defend against a hostile
-same-user process racing filesystem changes. Do not share the vault directory.
+root may be redirected by the operating system or user. On POSIX, Clave refuses
+vault operations if group or other users have permission on a vault directory,
+database, or key. Clave preserves existing permissions. If prompted, use
+`chmod go-rwx` on the affected vault path and run `clave doctor`. These checks do
+not defend against a hostile same-user process racing filesystem changes. Do not
+share the vault directory.
 
 SQLite transactions serialize competing writes, preserve original creation times
 and roll back failed replacement. This is not forensic secure deletion. Filesystem
